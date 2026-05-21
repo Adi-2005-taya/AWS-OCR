@@ -1,0 +1,21 @@
+{
+  "name": "anti-aws-text-extractor",
+  "version": "1.0.0",
+  "description": "An automated OCR-based document text extraction and search system that enables users to upload document images, automatically extracts text using optical character recognition, and provides full-text search capabilities.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "tesseract.js": "^7.0.0"
+  }
+}
