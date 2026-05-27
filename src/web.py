@@ -174,13 +174,19 @@ _app._monitor.start()
 _pending_hashes: dict = {}
 
 def _attach_hash_on_index(event):
-    """After a document is indexed, attach its file hash to metadata."""
+    """After a document is indexed, attach its file hash and filename to metadata."""
     doc_id_str = str(event.document_id)
     if doc_id_str in _pending_hashes:
-        doc = _engine.documents.get(event.document_id)
-        if doc:
-            doc.metadata.update(_pending_hashes.pop(doc_id_str))
-            _engine._save()
+        info = _pending_hashes.pop(doc_id_str)
+        # Wait briefly for the engine to finish indexing, then patch
+        import threading
+        def patch():
+            import time; time.sleep(0.5)
+            doc = _engine.documents.get(event.document_id)
+            if doc:
+                doc.metadata.update(info)
+                _engine._save()
+        threading.Thread(target=patch, daemon=True).start()
 
 _status_mgr.register_change_callback(_attach_hash_on_index)
 
@@ -263,32 +269,81 @@ def get_status(document_id: str):
 @app.get("/search")
 def search(query: str, limit: int = 10, user_id: Optional[str] = None):
     try:
+        import re as _re
+
+        # ── Phrase search: "exact phrase" in quotes ──
+        phrase_match = _re.match(r'^["\'](.+)["\']$', query.strip())
+        if phrase_match:
+            phrase = phrase_match.group(1).lower()
+            results = []
+            for doc_id, doc in _engine.documents.items():
+                if phrase in doc.cleanedText.lower():
+                    # Find context around the phrase
+                    idx = doc.cleanedText.lower().find(phrase)
+                    start = max(0, idx - 80)
+                    end   = min(len(doc.cleanedText), idx + 160)
+                    snippet = ("..." if start > 0 else "") + \
+                              doc.cleanedText[start:end].strip() + \
+                              ("..." if end < len(doc.cleanedText) else "")
+
+                    pages_found = []
+                    raw_pages = doc.metadata.get("pages", [])
+                    for i, page_text in enumerate(raw_pages, start=1):
+                        if phrase in page_text.lower():
+                            pages_found.append(i)
+
+                    try:
+                        url = _storage.get_url(doc_id)
+                    except Exception:
+                        url = f"storage://{doc_id}"
+
+                    results.append({
+                        "document_id": str(doc_id),
+                        "score":       1.0,
+                        "snippet":     snippet,
+                        "storage_url": url,
+                        "pages_found": pages_found,
+                        "match_type":  "phrase",
+                    })
+                    if len(results) >= limit:
+                        break
+
+            return {"query": query, "count": len(results), "results": results,
+                    "mode": "phrase"}
+
+        # ── Normal keyword search with whole-word matching ──
         hits = _app.search(query, limit=limit, user_id=user_id)
-        results = []
         q_lower = query.lower()
+        results = []
 
         for h in hits:
             pages_found = []
-            context_snippet = h.snippet  # fallback
+            context_snippet = h.snippet
 
             doc = _engine.documents.get(h.document_id)
             if doc:
                 raw_pages = doc.metadata.get("pages", [])
+                # Whole-word check: all query words must appear as whole words
+                words = _re.findall(r'\b\w+\b', q_lower)
+                text_lower = doc.cleanedText.lower()
+                all_match = all(
+                    bool(_re.search(r'\b' + _re.escape(w) + r'\b', text_lower))
+                    for w in words if len(w) >= 3
+                )
+                if not all_match:
+                    continue  # skip partial-word matches
 
-                # Find pages containing the query
                 for i, page_text in enumerate(raw_pages, start=1):
                     if q_lower in page_text.lower():
                         pages_found.append(i)
 
-                # Build a context snippet: text around the first match
-                full_text = doc.cleanedText
-                idx = full_text.lower().find(q_lower)
+                idx = text_lower.find(q_lower)
                 if idx != -1:
                     start = max(0, idx - 80)
-                    end   = min(len(full_text), idx + 160)
+                    end   = min(len(doc.cleanedText), idx + 160)
                     context_snippet = ("..." if start > 0 else "") + \
-                                      full_text[start:end].strip() + \
-                                      ("..." if end < len(full_text) else "")
+                                      doc.cleanedText[start:end].strip() + \
+                                      ("..." if end < len(doc.cleanedText) else "")
 
             results.append({
                 "document_id": str(h.document_id),
@@ -296,9 +351,11 @@ def search(query: str, limit: int = 10, user_id: Optional[str] = None):
                 "snippet":     context_snippet,
                 "storage_url": h.storage_url,
                 "pages_found": pages_found,
+                "match_type":  "keyword",
             })
 
-        return {"query": query, "count": len(results), "results": results}
+        return {"query": query, "count": len(results), "results": results,
+                "mode": "keyword"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -362,8 +419,15 @@ def list_documents():
         except Exception:
             url = doc.metadata.get("storage_url", f"storage://{doc_id}")
 
-        # Get filename from metadata or fallback
-        filename = doc.metadata.get("filename", "Unknown file")
+        # Get filename from metadata or derive from text
+        filename = doc.metadata.get("filename", "")
+        if not filename or filename == "Unknown file" or filename == "restored":
+            # Derive from first line of cleaned text
+            first_line = doc.cleanedText.strip().split('\n')[0].strip()[:50]
+            if first_line:
+                filename = first_line.replace('/', '-') + ".pdf"
+            else:
+                filename = f"document-{str(doc_id)[:8]}.pdf"
         page_count = doc.metadata.get("page_count", "?")
         chars = doc.metadata.get("chars", len(doc.cleanedText))
 
@@ -381,6 +445,45 @@ def list_documents():
     # Sort newest first
     docs.sort(key=lambda x: x["index_timestamp"], reverse=True)
     return {"count": len(docs), "documents": docs}
+
+@app.get("/documents/{document_id}")
+def get_document(document_id: str):
+    """Retrieve full details of a single indexed document."""
+    try:
+        uid = UUID(document_id)
+        if uid not in _engine.documents:
+            raise HTTPException(status_code=404, detail="Document not found")
+        doc = _engine.documents[uid]
+        try:
+            url = _storage.get_url(uid)
+        except Exception:
+            url = doc.metadata.get("storage_url", f"storage://{uid}")
+        
+        fname = doc.metadata.get("filename", "")
+        if not fname or fname == "Unknown file" or fname == "restored":
+            first_line = doc.cleanedText.strip().split('\n')[0].strip()[:50]
+            fname = (first_line.replace('/', '-') + ".pdf") if first_line else f"document-{str(uid)[:8]}.pdf"
+
+        return {
+            "document_id":      str(uid),
+            "filename":         fname,
+            "storage_url":      url,
+            "cleaned_text":     doc.cleanedText,
+            "keywords":         doc.keywords,
+            "page_count":       doc.metadata.get("page_count", 1),
+            "pages":            doc.metadata.get("pages", [doc.cleanedText]),
+            "chars":            doc.metadata.get("chars", len(doc.cleanedText)),
+            "index_timestamp":  doc.indexTimestamp.isoformat(),
+            "metadata":         doc.metadata,
+        }
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid document ID format")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/debug")
 def debug():
     docs = list(_engine.documents.values())
     return {
