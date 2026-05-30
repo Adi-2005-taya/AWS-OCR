@@ -304,7 +304,7 @@ async def auth_login(request: Request,
         return JSONResponse({"ok": False, "error": error}, status_code=401)
     token = create_session_token(user_id)
     resp  = JSONResponse({"ok": True})
-    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax",
+    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="none", secure=True,
                     max_age=60*60*24*7)
     return resp
 
@@ -320,7 +320,7 @@ async def auth_signup(request: Request,
     user_id, _ = authenticate_user(email, password)
     token = create_session_token(user_id)
     resp  = JSONResponse({"ok": True})
-    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax",
+    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="none", secure=True,
                     max_age=60*60*24*7)
     return resp
 
@@ -449,7 +449,7 @@ async def google_callback(request: Request, code: str = "", state: str = "",
     user_id = login_or_create_google_user(google_info)
     token   = create_session_token(user_id)
     resp    = RedirectResponse(url="/", status_code=303)
-    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax",
+    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="none", secure=True,
                     max_age=60*60*24*7)
     return resp
 
