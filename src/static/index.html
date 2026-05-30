@@ -14,7 +14,7 @@
        any stylesheet has even been parsed. */
     if (t === 'laser') {
       var s = document.createElement('style');
-      s.textContent = 'body,html{background:transparent!important}#bg-canvas,#fx-canvas{display:none!important}#laser-flow-container{display:block!important;background:#1a052e}';
+      s.textContent = '[data-theme="laser"] html {background:#1a052e!important} [data-theme="laser"] body {background:transparent!important} [data-theme="laser"] #bg-canvas, [data-theme="laser"] #fx-canvas {display:none!important} [data-theme="laser"] #laser-flow-container, [data-theme="laser"] #laser-bg-shield {display:block!important;background:#1a052e} [data-theme="laser"] body,[data-theme="laser"] html {transition:none!important} [data-theme="laser"] .edge-lighting {display:none!important}';
       document.head.appendChild(s);
     }
   } catch(e) {}
@@ -97,9 +97,12 @@ body{
   transition:background .4s,color .4s;
 }
 /* Laser theme: body must be transparent so the WebGL canvas shows through */
-[data-theme="laser"] html,
+[data-theme="laser"] html {
+  background: #1a052e !important;
+}
 [data-theme="laser"] body {
   background: transparent !important;
+  transition: none !important; /* kill the 400ms flash on theme change */
 }
 
 /* ═══════════════════════════════════════════
@@ -1332,7 +1335,7 @@ html[data-theme="light"] #theme-icon-rays {
 
 /* --- MATRIX (Pure Terminal) --- */
 [data-theme="matrix"] .card, [data-theme="matrix"] .search-bar {
-  background: transparent !important;
+  background: #050505 !important;
   border: none !important;
   border-left: 2px solid var(--p1) !important;
   border-radius: 0 !important;
@@ -1386,6 +1389,8 @@ html[data-theme="light"] #theme-icon-rays {
 [data-theme="laser"] #bg-canvas { display: none !important; }
 [data-theme="laser"] #fx-canvas  { display: none !important; }
 [data-theme="laser"] #laser-flow-container { display: block !important; background: #1a052e; }
+[data-theme="laser"] #laser-bg-shield { display: block !important; }
+[data-theme="laser"] .edge-lighting { display: none !important; }
 [data-theme="laser"] .card, [data-theme="laser"] .search-bar {
   border-radius: 20px !important;
   backdrop-filter: blur(12px) !important;
@@ -1395,6 +1400,121 @@ html[data-theme="light"] #theme-icon-rays {
   box-shadow: 0 4px 20px rgba(255,121,198,0.15) !important;
 }
 [data-theme="laser"] .btn { border-radius: 12px !important; }
+/* ── LASER MODE OVERLAY EFFECTS ─────────────────────────────────────────────── */
+
+/* Floating orb particles */
+[data-theme="laser"] #laser-orbs { display: block !important; }
+#laser-orbs {
+  position: fixed; inset: 0; z-index: -3;
+  pointer-events: none; display: none;
+  overflow: hidden;
+}
+.laser-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(6px);
+  opacity: 0;
+  animation: laser-orb-rise linear infinite;
+}
+
+/* Troubleshooting Popup - only shows in laser mode */
+[data-theme="laser"] #laser-troubleshoot-popup.visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+#laser-troubleshoot-popup {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  background: rgba(18, 15, 23, 0.95);
+  border: 1px solid rgba(255, 121, 198, 0.5);
+  border-radius: 12px;
+  padding: 16px 20px;
+  color: #f8f8f2;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.95rem;
+  z-index: 999999;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 121, 198, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  max-width: 400px;
+  width: 90%;
+  transform: translate(-50%, -150%);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+  opacity: 0;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+}
+#laser-troubleshoot-popup .close-btn {
+  background: none;
+  border: none;
+  color: #bd93f9;
+  cursor: pointer;
+  font-size: 1.5rem;
+  padding: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+#laser-troubleshoot-popup .close-btn:hover {
+  color: #ff79c6;
+}
+@keyframes laser-orb-rise {
+  0%   { transform: translateY(0) scale(1);   opacity: 0; }
+  10%  { opacity: 1; }
+  85%  { opacity: 0.7; }
+  100% { transform: translateY(-110vh) scale(0.4); opacity: 0; }
+}
+
+/* Scanline pulse sweep */
+[data-theme="laser"] #laser-scanline { display: block !important; }
+#laser-scanline {
+  position: fixed; inset: 0; z-index: -1;
+  pointer-events: none; display: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(168,85,247,0.025) 3px,
+    rgba(168,85,247,0.025) 4px
+  );
+  animation: laser-scanpulse 4s ease-in-out infinite;
+}
+@keyframes laser-scanpulse {
+  0%,100% { opacity: 0.4; }
+  50%      { opacity: 1.0; }
+}
+
+/* Corner energy vent glows */
+[data-theme="laser"] #laser-corners { display: block !important; }
+#laser-corners {
+  position: fixed; inset: 0; z-index: -2;
+  pointer-events: none; display: none;
+}
+.laser-corner {
+  position: absolute;
+  width: 320px; height: 320px;
+  border-radius: 50%;
+  animation: laser-corner-pulse 3s ease-in-out infinite;
+}
+.laser-corner.tl { top: -120px; left: -120px;
+  background: radial-gradient(circle, rgba(255,121,198,0.22) 0%, transparent 70%);
+  animation-delay: 0s; }
+.laser-corner.tr { top: -120px; right: -120px;
+  background: radial-gradient(circle, rgba(139,233,253,0.15) 0%, transparent 70%);
+  animation-delay: 1s; }
+.laser-corner.bl { bottom: -120px; left: -120px;
+  background: radial-gradient(circle, rgba(189,147,249,0.20) 0%, transparent 70%);
+  animation-delay: 0.5s; }
+.laser-corner.br { bottom: -120px; right: -120px;
+  background: radial-gradient(circle, rgba(255,184,108,0.15) 0%, transparent 70%);
+  animation-delay: 1.5s; }
+@keyframes laser-corner-pulse {
+  0%,100% { transform: scale(1);   opacity: 0.6; }
+  50%      { transform: scale(1.25); opacity: 1.0; }
+}
 </style>
 
 </head>
@@ -1457,15 +1577,33 @@ html[data-theme="light"] #theme-icon-rays {
 })();
 </script>
 
-<!-- Aurora / background canvas -->
+<!-- Laser-mode instant dark shield: renders before WebGL canvas, kills FOUC -->
+<div id="laser-bg-shield" style="position:fixed;inset:0;z-index:-5;background:#1a052e;pointer-events:none;display:none;"></div>
+
 <canvas id="bg-canvas"></canvas>
-<!-- LaserFlow background container -->
 <div id="laser-flow-container" style="position:fixed;inset:0;z-index:-4;pointer-events:none;display:none;"></div>
+<!-- Laser orb particles -->
+<div id="laser-orbs"></div>
+<!-- Laser scanline overlay -->
+<div id="laser-scanline"></div>
+<!-- Laser corner energy vents -->
+<div id="laser-corners">
+  <div class="laser-corner tl"></div>
+  <div class="laser-corner tr"></div>
+  <div class="laser-corner bl"></div>
+  <div class="laser-corner br"></div>
+</div>
 <!-- FX overlay canvas -->
 <canvas id="fx-canvas" style="position:fixed;inset:0;z-index:-2;pointer-events:none"></canvas>
 
 <!-- Toast notification -->
 <div id="toast"></div>
+
+<!-- Laser Troubleshoot Popup -->
+<div id="laser-troubleshoot-popup">
+  <div>If you are seeing a solid purple or colored screen with no laser effects, please Reload the page once..... Sorry for the error.</div>
+  <button class="close-btn" onclick="this.parentElement.classList.remove('visible')">✕</button>
+</div>
 
 <!-- Scroll wave lines -->
 <svg id="scroll-waves" viewBox="0 0 100 12" preserveAspectRatio="none" style="height:12px">
@@ -2958,7 +3096,19 @@ function updateThemeUI(theme) {
   else if(theme === 'light')  { icon = '☀️';  text = 'Light'; }
   else if(theme === 'matrix') { icon = '🖥️'; text = 'Matrix'; }
   else if(theme === 'warp')   { icon = '🚀';  text = 'Warp'; }
-  else                        { icon = '✨';  text = 'Laser'; }
+  else { 
+    icon = '✨';  
+    text = 'Laser'; 
+    setTimeout(() => {
+      const popup = document.getElementById('laser-troubleshoot-popup');
+      if (popup && document.documentElement.getAttribute('data-theme') === 'laser') {
+        if (!sessionStorage.getItem('laser-troubleshoot-shown')) {
+          popup.classList.add('visible');
+          sessionStorage.setItem('laser-troubleshoot-shown', 'true');
+        }
+      }
+    }, 2000);
+  }
 
   if(thumb)   thumb.textContent = icon;
   if(label)   label.textContent = text;
@@ -3128,39 +3278,58 @@ function trackStatusProgress(docId){
   const progBar=document.getElementById('prog-upload');
   const hl=document.getElementById('hamster-loader');
   if(statusPollInterval)clearInterval(statusPollInterval);
-  setResult('upload',`📥 <b>File Uploaded</b>\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${docId}</span>\n<b>Status:</b> <span class="tag UPLOADED">UPLOADED</span>\n\n⚙️ Starting OCR and indexation. Please wait...`,'success');
+  setResult('upload',`📥 <b>File Uploaded</b>\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${docId}</span>\n<b>Status:</b> <span class="tag UPLOADED">UPLOADED</span>\n\n⚡ OCR started — tracking status...`,'success');
   if(progBar)progBar.style.display='block';
   if(hl)hl.style.display='flex';
-  statusPollInterval=setInterval(async()=>{
+
+  // Adaptive polling: very fast at first (catches quick docs), slows down after 6s
+  const startTime = Date.now();
+  let pollDelay = 300;  // start at 300ms
+  const MAX_DELAY = 1200;
+
+  async function poll(){
     try{
-      const r=await fetch('/status/'+docId);const d=await r.json();
-      if(!r.ok){clearInterval(statusPollInterval);if(progBar)progBar.style.display='none';if(hl)hl.style.display='none';return}
+      const r=await fetch('/status/'+docId);
+      const d=await r.json();
+      if(!r.ok){
+        if(progBar)progBar.style.display='none';
+        if(hl)hl.style.display='none';
+        return;
+      }
       if(d.status==='PROCESSING'){
         setResult('upload',`⚙️ <b>Processing OCR Service</b>\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${docId}</span>\n<b>Status:</b> <span class="tag PROCESSING">PROCESSING</span>\n\nExtracting text content from pages...`,'success');
       }else if(d.status==='INDEXED'){
-        clearInterval(statusPollInterval);
         if(progBar)progBar.style.display='none';
         if(hl)hl.style.display='none';
-        setResult('upload',`✓ <b>Document Fully Indexed!</b>\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${docId}</span>\n<b>Status:</b> <span class="tag INDEXED">INDEXED</span>\n\nDocument text is now searchable.`,'success');
+        const elapsed=((Date.now()-startTime)/1000).toFixed(1);
+        setResult('upload',`✓ <b>Document Fully Indexed!</b>\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${docId}</span>\n<b>Status:</b> <span class="tag INDEXED">INDEXED</span>\n<b>⚡ Done in ${elapsed}s</b>\n\nDocument text is now searchable.`,'success');
         toast('Document successfully indexed!');
         confettiBurst();
         resetDropZone();
         loadDocuments();
         loadMetrics();
         setTimeout(()=>openDocDrawer(docId),800);
+        return; // stop polling
       }else if(d.status==='FAILED'){
-        clearInterval(statusPollInterval);
         if(progBar)progBar.style.display='none';
         if(hl)hl.style.display='none';
         setResult('upload',`❌ <b>Extraction Failed</b>\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${docId}</span>\n<b>Status:</b> <span class="tag FAILED">FAILED</span>\n\n${d.error_details?JSON.stringify(d.error_details):'Unknown OCR error'}`,'error');
         toast('Extraction failed','err');
+        return; // stop polling
       }
     }catch(e){
-      clearInterval(statusPollInterval);
       if(progBar)progBar.style.display='none';
       if(hl)hl.style.display='none';
+      return;
     }
-  },1000);
+    // Back off gradually: 300ms → 500ms → 800ms → 1200ms cap
+    const elapsed=Date.now()-startTime;
+    if(elapsed>6000) pollDelay=MAX_DELAY;
+    else if(elapsed>3000) pollDelay=800;
+    else if(elapsed>1500) pollDelay=500;
+    statusPollInterval=setTimeout(poll, pollDelay);
+  }
+  statusPollInterval=setTimeout(poll, pollDelay);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -3734,7 +3903,98 @@ document.addEventListener('keydown', (e) => {
   </div>
 </div>
 
-<script src="/static/laser.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════
+   LASER MODE EFFECTS MANAGER
+══════════════════════════════════════════════════════ */
+(function() {
+  const ORB_COUNT = 22;
+  const ORB_COLORS = [
+    'rgba(255,121,198,VAL)',   // pink
+    'rgba(189,147,249,VAL)',   // purple
+    'rgba(139,233,253,VAL)',   // cyan
+    'rgba(255,184,108,VAL)',   // orange
+    'rgba(168,85,247,VAL)',    // violet
+    'rgba(80,250,123,VAL)',    // green
+  ];
+
+  let orbsSpawned = false;
+
+  function spawnOrbs() {
+    if (orbsSpawned) return;
+    const container = document.getElementById('laser-orbs');
+    if (!container) return;
+    container.innerHTML = '';
+    for (let i = 0; i < ORB_COUNT; i++) {
+      const orb = document.createElement('div');
+      orb.className = 'laser-orb';
+      const size = 8 + Math.random() * 28; // 8-36px
+      const left = Math.random() * 100;     // % across screen
+      const bottom = -size + 'px';
+      const duration = 6 + Math.random() * 14; // 6-20s
+      const delay = -(Math.random() * duration); // stagger by starting mid-cycle
+      const colorTemplate = ORB_COLORS[Math.floor(Math.random() * ORB_COLORS.length)];
+      const opacity = (0.35 + Math.random() * 0.5).toFixed(2);
+      const color = colorTemplate.replace('VAL', opacity);
+      const blur = 4 + Math.random() * 10;
+      orb.style.cssText = [
+        `width:${size}px`, `height:${size}px`,
+        `left:${left}%`, `bottom:${bottom}`,
+        `background:${color}`,
+        `filter:blur(${blur}px)`,
+        `animation-duration:${duration}s`,
+        `animation-delay:${delay}s`
+      ].join(';');
+      container.appendChild(orb);
+    }
+    orbsSpawned = true;
+  }
+
+  function destroyOrbs() {
+    const container = document.getElementById('laser-orbs');
+    if (container) container.innerHTML = '';
+    orbsSpawned = false;
+  }
+
+  function showTroubleshootPopup() {
+    setTimeout(() => {
+      const popup = document.getElementById('laser-troubleshoot-popup');
+      if (popup) popup.classList.add('visible');
+    }, 1500);
+  }
+
+  // Patch pickTheme to trigger orb lifecycle
+  const _origPickTheme = window.pickTheme;
+  window.pickTheme = function(theme) {
+    if (_origPickTheme) _origPickTheme(theme);
+    if (theme === 'laser') {
+      // Small delay so CSS display:block kicks in first
+      setTimeout(spawnOrbs, 100);
+      showTroubleshootPopup();
+    } else {
+      destroyOrbs();
+      const popup = document.getElementById('laser-troubleshoot-popup');
+      if (popup) popup.classList.remove('visible');
+    }
+  };
+
+  // Auto-start if already on laser theme at page load
+  window.addEventListener('load', function() {
+    const theme = document.documentElement.getAttribute('data-theme');
+    if (theme === 'laser') {
+      setTimeout(spawnOrbs, 800);
+      showTroubleshootPopup();
+    }
+  });
+})();
+</script>
+
+<div id="laser-troubleshoot-popup">
+  <div>If you are seeing a solid purple or colored screen with no laser effects, please <strong>Reload</strong> the page once.</div>
+  <button class="close-btn" onclick="document.getElementById('laser-troubleshoot-popup').classList.remove('visible')">&times;</button>
+</div>
+
+<script src="/static/laser.js?v=8"></script>
 
 </body>
 </html>

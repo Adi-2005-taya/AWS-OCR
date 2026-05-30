@@ -435,7 +435,7 @@ void main(){
   };
 
   window.addEventListener('resize', setSizeNow);
-  setTimeout(setSizeNow, 100);
+  setSizeNow(); // Render instantly to prevent FOUC flash
 
   window.addEventListener('mousemove', (ev) => {
     const w = mount.clientWidth || 1;

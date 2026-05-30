@@ -78,9 +78,9 @@ class RealFileOCRService(OCRServiceInterface):
 
     def _clean(self, text: str) -> str:
         """Strip non-ASCII garbage, collapse spaces, drop short lines."""
-        chars = [c if (ord(c) < 128 and (c.isprintable() or c in " \n\t\r")) else " "
-                 for c in text]
-        cleaned = re.sub(r"[ \t]+", " ", "".join(chars))
+        # Fast regex-based approach instead of per-character loop
+        cleaned = re.sub(r'[^\x00-\x7F\n\t\r ]+', ' ', text)  # non-ASCII → space
+        cleaned = re.sub(r'[ \t]+', ' ', cleaned)              # collapse horizontal whitespace
         lines = [l.strip() for l in cleaned.splitlines() if len(l.strip()) >= 3]
         return "\n".join(lines).strip()
 
@@ -89,23 +89,75 @@ class RealFileOCRService(OCRServiceInterface):
             import pytesseract
             from PIL import Image
             pytesseract.pytesseract.tesseract_cmd = _TESSERACT
-            return pytesseract.image_to_string(Image.open(io.BytesIO(image_bytes))).strip()
+            img = Image.open(io.BytesIO(image_bytes))
+            # Downscale massive images — speeds up OCR significantly
+            max_dim = 1800
+            if max(img.width, img.height) > max_dim:
+                img.thumbnail((max_dim, max_dim), Image.Resampling.BILINEAR)
+            return pytesseract.image_to_string(img, config='--oem 3 --psm 3').strip()
         except Exception:
             return ""
 
     def _pdf_pages(self, data: bytes):
-        """Return list of per-page text strings (Tesseract preferred)."""
-        # Primary: image-based OCR — handles custom/embedded fonts
+        """Return list of per-page text strings.
+
+        Priority:
+          1. PyMuPDF native text  — instant, zero rasterization for digital PDFs
+          2. Parallel Tesseract   — for scanned/image-only PDFs (lower dpi=150)
+          3. pdfplumber fallback  — last resort
+        """
+        # ── 1. PyMuPDF fast native extraction ──────────────────────────
         try:
+            import fitz  # PyMuPDF
+            doc = fitz.open(stream=data, filetype="pdf")
+            pages_text = [page.get_text().strip() for page in doc]
+            total = sum(len(p) for p in pages_text)
+            if total > 50:  # has meaningful native text
+                doc.close()
+                return pages_text
+            # Image-only PDF — rasterize for Tesseract below
+            pix_list = []
+            for page in doc:
+                pix_list.append(page.get_pixmap(dpi=150))
+            doc.close()
+            # Convert pixmaps → PIL images and run Tesseract in parallel
             import pytesseract
-            from pdf2image import convert_from_bytes
+            from PIL import Image as _PIL_Image
             pytesseract.pytesseract.tesseract_cmd = _TESSERACT
-            images = convert_from_bytes(data, dpi=200, poppler_path=_POPPLER)
-            return [pytesseract.image_to_string(img).strip() for img in images]
+
+            def _ocr_pix(pix):
+                try:
+                    img = _PIL_Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                    return pytesseract.image_to_string(img, config='--oem 3 --psm 3').strip()
+                except Exception:
+                    return ""
+
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=min(4, len(pix_list) or 1)) as ex:
+                return list(ex.map(_ocr_pix, pix_list))
         except Exception:
             pass
 
-        # Fallback: pdfplumber (text-based PDFs only)
+        # ── 2. Parallel Tesseract via pdf2image (lower DPI = faster) ───
+        try:
+            import pytesseract
+            from pdf2image import convert_from_bytes
+            from concurrent.futures import ThreadPoolExecutor
+            pytesseract.pytesseract.tesseract_cmd = _TESSERACT
+            images = convert_from_bytes(data, dpi=150, poppler_path=_POPPLER)
+
+            def _ocr_img(img):
+                try:
+                    return pytesseract.image_to_string(img, config='--oem 3 --psm 3').strip()
+                except Exception:
+                    return ""
+
+            with ThreadPoolExecutor(max_workers=min(4, len(images) or 1)) as ex:
+                return list(ex.map(_ocr_img, images))
+        except Exception:
+            pass
+
+        # ── 3. pdfplumber text-only fallback ───────────────────────────
         try:
             import pdfplumber
             with pdfplumber.open(io.BytesIO(data)) as pdf:

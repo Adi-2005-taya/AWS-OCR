@@ -11,6 +11,9 @@ authlib>=1.3.0
 # OCR dependencies (optional - only needed if using Tesseract provider)
 pytesseract>=0.3.10
 pillow>=10.0.0
+pymupdf>=1.23.0
+pdf2image>=1.16.0
+pdfplumber>=0.9.0
 
 # Development dependencies
 pytest>=7.4.0
