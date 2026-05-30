@@ -16,12 +16,20 @@ RUN apt-get update && apt-get install -y \
 # Set the working directory inside the container
 WORKDIR /app
 
+# Create a non-root user (Hugging Face Spaces requirement)
+RUN useradd -m -u 1000 user
+ENV PATH="/home/user/.local/bin:$PATH"
+
 # Copy the requirements file and install Python dependencies
-COPY requirements.txt .
+COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code into the container
-COPY . .
+COPY --chown=user . .
+
+# Set permissions for the application folder and switch to non-root user
+RUN chmod -R 777 /app
+USER user
 
 # Expose the port the app runs on
 EXPOSE 7860
