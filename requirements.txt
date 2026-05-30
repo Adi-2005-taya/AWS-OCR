@@ -1,3 +1,8 @@
+# Web Server
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+python-multipart>=0.0.6
+
 # Core dependencies
 pydantic>=2.0.0
 python-dotenv>=1.0.0
