@@ -1,4 +1,4 @@
-﻿"""Text cleaning and normalization for DocuSense System
+"""Text cleaning and normalization for DocuSense System
 
 This module provides text cleaning functions to normalize and structure
 OCR-extracted text for indexing and search.
@@ -104,21 +104,16 @@ class TextCleaner:
         text = re.sub(r' +', ' ', text)
         
         # Normalize line breaks (handle \r\n, \r, \n)
-        text = text.replace('\r\n', '\n')
-        text = text.replace('\r', '\n')
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
         
         # Remove multiple consecutive newlines (keep max 2 for paragraph breaks)
         text = re.sub(r'\n{3,}', '\n\n', text)
         
-        # Remove spaces at start/end of lines
-        lines = text.split('\n')
-        lines = [line.strip() for line in lines]
-        text = '\n'.join(lines)
+        # Remove spaces at start/end of lines using fast multiline regex
+        text = re.sub(r'^[ \t]+|[ \t]+$', '', text, flags=re.MULTILINE)
         
-        # Remove leading/trailing whitespace
-        text = text.strip()
-        
-        return text
+        # Remove leading/trailing whitespace from entire document
+        return text.strip()
     
     def correct_ocr_errors(self, text: str) -> str:
         """Correct common OCR errors.
@@ -141,7 +136,7 @@ class TextCleaner:
         return corrected
     
     def remove_non_printable(self, text: str) -> str:
-        """Remove non-printable characters.
+        """Remove non-printable characters (optimized).
         
         Removes control characters and other non-printable characters
         while preserving standard whitespace (spaces, tabs, newlines).
@@ -152,17 +147,9 @@ class TextCleaner:
         Returns:
             Text with non-printable characters removed
         """
-        # Keep only printable characters and standard whitespace
-        cleaned = []
-        for char in text:
-            # Keep if printable or standard whitespace
-            if char.isprintable() or char in (' ', '\t', '\n', '\r'):
-                cleaned.append(char)
-            # Also keep if it's a normal space category
-            elif unicodedata.category(char).startswith('Z'):
-                cleaned.append(' ')
-        
-        return ''.join(cleaned)
+        # Fast regex to strip ASCII control chars except \n, \r, \t
+        # This covers \x00-\x08, \x0B, \x0C, \x0E-\x1F, \x7F
+        return re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
     
     def normalize_case(self, text: str) -> str:
         """Normalize case for indexing.
