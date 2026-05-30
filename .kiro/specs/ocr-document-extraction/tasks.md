@@ -1,8 +1,8 @@
-# Implementation Plan: OCR Document Extraction
+﻿# Implementation Plan: DocuSense
 
 ## Overview
 
-This implementation plan breaks down the OCR Document Extraction system into discrete, actionable coding tasks. The system will be implemented in **Python** and follows an event-driven architecture with asynchronous processing. The implementation progresses from infrastructure setup through core components, integration, and comprehensive testing.
+This implementation plan breaks down the DocuSense system into discrete, actionable coding tasks. The system will be implemented in **Python** and follows an event-driven architecture with asynchronous processing. The implementation progresses from infrastructure setup through core components, integration, and comprehensive testing.
 
 ## Tasks
 

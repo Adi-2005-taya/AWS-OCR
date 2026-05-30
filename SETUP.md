@@ -1,6 +1,6 @@
-# Project Setup Summary
+﻿# Project Setup Summary
 
-This document summarizes the infrastructure setup for the OCR Document Extraction System.
+This document summarizes the infrastructure setup for the DocuSense System.
 
 ## Created Structure
 
@@ -205,4 +205,4 @@ This task satisfies the following requirements:
 - **Requirement 7.4**: Error logging with sufficient detail for debugging
 - **Requirement 8.1**: Asynchronous processing infrastructure
 
-The foundation is solid and ready for building the OCR document extraction system!
+The foundation is solid and ready for building the DocuSense system!

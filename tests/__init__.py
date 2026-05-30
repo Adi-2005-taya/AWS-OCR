@@ -1,1 +1,1 @@
-"""Test suite for OCR Document Extraction System"""
+﻿"""Test suite for DocuSense System"""

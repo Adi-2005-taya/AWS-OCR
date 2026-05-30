@@ -1,8 +1,8 @@
-# Storage Abstraction Layer
+﻿# Storage Abstraction Layer
 
 ## Overview
 
-The storage abstraction layer provides a unified interface for storing, retrieving, and deleting document images in the OCR Document Extraction system. It supports multiple storage backends and includes built-in encryption at rest.
+The storage abstraction layer provides a unified interface for storing, retrieving, and deleting document images in the DocuSense system. It supports multiple storage backends and includes built-in encryption at rest.
 
 ## Architecture
 

@@ -1,4 +1,4 @@
-"""Error handling and notification for OCR Document Extraction System
+﻿"""Error handling and notification for DocuSense System
 
 This module provides comprehensive error logging with context and user
 notification for OCR failures.

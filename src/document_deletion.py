@@ -1,4 +1,4 @@
-"""Document deletion service for OCR Document Extraction System
+﻿"""Document deletion service for DocuSense System
 
 Handles atomic deletion of documents from both storage and the search
 index, with compensation on partial failure.

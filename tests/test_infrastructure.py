@@ -54,7 +54,7 @@ class TestSettings:
         """Test creating settings instance"""
         settings = Settings()
         
-        assert settings.app_name == "OCR Document Extraction"
+        assert settings.app_name in ["DocuSense", "OCR Document Extraction"]
         assert settings.app_version == "0.1.0"
         assert settings.environment in ["development", "staging", "production"]
     

@@ -1,4 +1,4 @@
-"""FastAPI web server for OCR Document Extraction System
+"""FastAPI web server for DocuSense System
 
 Run with:
     uvicorn src.web:app --reload
@@ -13,8 +13,28 @@ from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
+
+from src.auth import (
+    COOKIE_NAME,
+    _redirect_to_login,
+    authenticate_user,
+    build_google_auth_url,
+    consume_reset_token,
+    create_reset_token,
+    create_session_token,
+    create_user,
+    exchange_google_code,
+    get_current_user,
+    google_is_configured,
+    load_users,
+    login_or_create_google_user,
+    require_auth,
+    send_reset_email,
+    verify_reset_token,
+)
 
 from src.application import OCRApplication
 from src.cache import DocumentCache
@@ -33,13 +53,19 @@ from src.validation import FileTypeValidator
 # ---------------------------------------------------------------------------
 # Tool paths
 # ---------------------------------------------------------------------------
+import sys
 
-_TESSERACT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-_POPPLER   = (
-    r"C:\Users\wbadi\AppData\Local\Microsoft\WinGet\Packages"
-    r"\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe"
-    r"\poppler-25.07.0\Library\bin"
-)
+if sys.platform == "win32":
+    _TESSERACT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    _POPPLER   = (
+        r"C:\Users\wbadi\AppData\Local\Microsoft\WinGet\Packages"
+        r"\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe"
+        r"\poppler-25.07.0\Library\bin"
+    )
+else:
+    _TESSERACT = "/usr/bin/tesseract"
+    _POPPLER   = None  # On Linux, pdf2image will automatically find poppler in system PATH
+
 
 # ---------------------------------------------------------------------------
 # Real OCR service with per-page tracking
@@ -194,20 +220,194 @@ _status_mgr.register_change_callback(_attach_hash_on_index)
 # FastAPI
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="OCR Document Extraction", version="0.1.0")
+app = FastAPI(title="DocuSense", version="0.1.0")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
-_HTML_FILE = Path(__file__).parent / "static" / "index.html"
+_HTML_FILE          = Path(__file__).parent / "static" / "index.html"
+_ABOUT_FILE         = Path(__file__).parent / "static" / "about.html"
+_LOGIN_FILE         = Path(__file__).parent / "static" / "login.html"
+_SIGNUP_FILE        = Path(__file__).parent / "static" / "signup.html"
+_FORGOT_FILE        = Path(__file__).parent / "static" / "forgot-password.html"
+_RESET_FILE         = Path(__file__).parent / "static" / "reset-password.html"
+
+# ---------------------------------------------------------------------------
+# Auth exception handler — catches require_auth redirects
+# ---------------------------------------------------------------------------
+
+@app.exception_handler(_redirect_to_login)
+async def auth_redirect_handler(request: Request, exc: _redirect_to_login):
+    return RedirectResponse(url="/login", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Auth endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/auth/login")
+async def auth_login(request: Request,
+                     email: str = Form(...),
+                     password: str = Form(...)):
+    user_id, error = authenticate_user(email, password)
+    if error:
+        return JSONResponse({"ok": False, "error": error}, status_code=401)
+    token = create_session_token(user_id)
+    resp  = JSONResponse({"ok": True})
+    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax",
+                    max_age=60*60*24*7)
+    return resp
+
+
+@app.post("/auth/signup")
+async def auth_signup(request: Request,
+                      name: str = Form(...),
+                      email: str = Form(...),
+                      password: str = Form(...)):
+    ok, error = create_user(name, email, password)
+    if not ok:
+        return JSONResponse({"ok": False, "error": error}, status_code=400)
+    user_id, _ = authenticate_user(email, password)
+    token = create_session_token(user_id)
+    resp  = JSONResponse({"ok": True})
+    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax",
+                    max_age=60*60*24*7)
+    return resp
+
+
+@app.get("/auth/logout")
+def auth_logout():
+    resp = RedirectResponse(url="/login", status_code=303)
+    resp.delete_cookie(COOKIE_NAME)
+    return resp
+
+
+@app.get("/me")
+def me(request: Request):
+    """Return current user info (name + email + picture) for the header display."""
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse({"authenticated": False})
+    users = load_users()
+    u = users.get(user_id, {})
+    return {"authenticated": True, "name": u.get("name", user_id),
+            "email": u.get("email", user_id), "picture": u.get("picture", "")}
+
+
+# ---------------------------------------------------------------------------
+# Page routes — protected
+# ---------------------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
-def index():
+def index(request: Request, user_id: str = Depends(require_auth)):
     return _HTML_FILE.read_text(encoding="utf-8")
+
+@app.get("/about", response_class=HTMLResponse)
+def about(request: Request, user_id: str = Depends(require_auth)):
+    return _ABOUT_FILE.read_text(encoding="utf-8")
+
+@app.get("/login", response_class=HTMLResponse)
+def login(request: Request):
+    # Already logged in? Go to app
+    if get_current_user(request):
+        return RedirectResponse(url="/", status_code=303)
+    return _LOGIN_FILE.read_text(encoding="utf-8")
+
+@app.get("/signup", response_class=HTMLResponse)
+def signup(request: Request):
+    if get_current_user(request):
+        return RedirectResponse(url="/", status_code=303)
+    return _SIGNUP_FILE.read_text(encoding="utf-8")
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request):
+    return _FORGOT_FILE.read_text(encoding="utf-8")
+
+@app.get("/reset-password", response_class=HTMLResponse)
+def reset_password_page(request: Request, token: str = ""):
+    """Validate token early so we can show an error before the form."""
+    return _RESET_FILE.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Password reset API
+# ---------------------------------------------------------------------------
+
+@app.post("/auth/forgot-password")
+async def auth_forgot(email: str = Form(...)):
+    """
+    Always return 200 (don't leak whether email exists).
+    Sends reset email if account found.
+    """
+    import os
+    base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+    token = create_reset_token(email)
+    if token:
+        reset_url = f"{base_url}/reset-password?token={token}"
+        ok, err = send_reset_email(email, reset_url)
+        if not ok:
+            # Return the token in dev mode so user can test without SMTP
+            return JSONResponse({"ok": True, "dev_token": token,
+                                 "email_error": err})
+    return JSONResponse({"ok": True})
+
+
+@app.post("/auth/reset-password")
+async def auth_reset(token: str = Form(...),
+                     password: str = Form(...)):
+    ok, error = consume_reset_token(token, password)
+    if not ok:
+        return JSONResponse({"ok": False, "error": error}, status_code=400)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/auth/verify-reset-token")
+def verify_reset(token: str = ""):
+    user_id = verify_reset_token(token)
+    if not user_id:
+        return JSONResponse({"valid": False})
+    return JSONResponse({"valid": True})
+
+
+# ---------------------------------------------------------------------------
+# Google OAuth
+# ---------------------------------------------------------------------------
+
+@app.get("/auth/google")
+def google_auth(request: Request):
+    if not google_is_configured():
+        return JSONResponse({"error": "Google OAuth not configured"}, status_code=503)
+    base_url = str(request.base_url).rstrip("/")
+    redirect_uri = f"{base_url}/auth/google/callback"
+    url = build_google_auth_url(redirect_uri)
+    return RedirectResponse(url=url, status_code=302)
+
+
+@app.get("/auth/google/callback")
+async def google_callback(request: Request, code: str = "", state: str = "",
+                          error: str = ""):
+    from src.auth import validate_google_state
+    if error or not code:
+        return RedirectResponse(url="/login?error=google_denied", status_code=303)
+    if not validate_google_state(state):
+        return RedirectResponse(url="/login?error=invalid_state", status_code=303)
+    base_url = str(request.base_url).rstrip("/")
+    redirect_uri = f"{base_url}/auth/google/callback"
+    google_info = await exchange_google_code(code, redirect_uri)
+    if not google_info or not google_info.get("email"):
+        return RedirectResponse(url="/login?error=google_failed", status_code=303)
+    user_id = login_or_create_google_user(google_info)
+    token   = create_session_token(user_id)
+    resp    = RedirectResponse(url="/", status_code=303)
+    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax",
+                    max_age=60*60*24*7)
+    return resp
+
 
 # ---------------------------------------------------------------------------
 # Upload
 # ---------------------------------------------------------------------------
 
 @app.post("/upload")
-async def upload(file: UploadFile = File(...)):
+async def upload(request: Request, file: UploadFile = File(...), user_id: str = Depends(require_auth)):
     import hashlib
     data = await file.read()
     content_type = file.content_type or "application/octet-stream"
@@ -215,7 +415,7 @@ async def upload(file: UploadFile = File(...)):
     # Duplicate detection — hash the file content
     file_hash = hashlib.sha256(data).hexdigest()
     for doc_id, doc in _engine.documents.items():
-        if doc.metadata.get("file_hash") == file_hash:
+        if getattr(doc, "ownerId", None) == user_id and doc.metadata.get("file_hash") == file_hash:
             # Already indexed — return existing document instead of re-processing
             return {
                 "document_id": str(doc_id),
@@ -226,7 +426,7 @@ async def upload(file: UploadFile = File(...)):
             }
 
     try:
-        result = _app.upload(data, filename=file.filename, content_type=content_type)
+        result = _app.upload(data, filename=file.filename, content_type=content_type, owner_id=user_id)
         _metrics.record_upload()
         # Store hash in the engine doc after indexing (done async, so store in a pending map)
         _pending_hashes[str(result.document_id)] = {
@@ -248,9 +448,14 @@ async def upload(file: UploadFile = File(...)):
 # ---------------------------------------------------------------------------
 
 @app.get("/status/{document_id}")
-def get_status(document_id: str):
+def get_status(document_id: str, user_id: str = Depends(require_auth)):
     try:
         uid    = UUID(document_id)
+        # Check ownership
+        doc = _engine.documents.get(uid)
+        if doc and getattr(doc, "ownerId", None) != user_id:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        
         result = _app.get_status(uid)
         return {
             "document_id":  str(result.document_id),
@@ -259,15 +464,58 @@ def get_status(document_id: str):
         }
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid document ID format")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+# ---------------------------------------------------------------------------
+# Download
+# ---------------------------------------------------------------------------
+
+@app.get("/download/{document_id}")
+def download_document(document_id: str, user_id: str = Depends(require_auth)):
+    try:
+        uid = UUID(document_id)
+        # Check ownership
+        doc = _engine.documents.get(uid)
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+        if getattr(doc, "ownerId", None) != user_id:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        
+        # Download bytes from storage
+        file_bytes = _app.storage.download(uid)
+        # Determine content type (fallback to octet-stream if metadata is missing)
+        content_type = "application/octet-stream"
+        filename = "document"
+        if getattr(doc, "metadata", None):
+            filename = doc.metadata.get("filename", filename)
+            content_type = doc.metadata.get("contentType")
+            
+        if not content_type or content_type == "application/octet-stream":
+            import mimetypes
+            guessed_type, _ = mimetypes.guess_type(filename)
+            content_type = guessed_type or "application/octet-stream"
+        
+        headers = {
+            "Content-Disposition": f'inline; filename="{filename}"'
+        }
+        
+        return Response(content=file_bytes, media_type=content_type, headers=headers)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid document ID format")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ---------------------------------------------------------------------------
 # Search — with page numbers
 # ---------------------------------------------------------------------------
 
 @app.get("/search")
-def search(query: str, limit: int = 10, user_id: Optional[str] = None):
+def search(query: str, limit: int = 10, user_id: str = Depends(require_auth)):
     try:
         import re as _re
 
@@ -277,6 +525,8 @@ def search(query: str, limit: int = 10, user_id: Optional[str] = None):
             phrase = phrase_match.group(1).lower()
             results = []
             for doc_id, doc in _engine.documents.items():
+                if getattr(doc, "ownerId", None) != user_id:
+                    continue
                 if phrase in doc.cleanedText.lower():
                     # Find context around the phrase
                     idx = doc.cleanedText.lower().find(phrase)
@@ -322,6 +572,8 @@ def search(query: str, limit: int = 10, user_id: Optional[str] = None):
 
             doc = _engine.documents.get(h.document_id)
             if doc:
+                if getattr(doc, "ownerId", None) != user_id:
+                    continue
                 raw_pages = doc.metadata.get("pages", [])
                 # Whole-word check: all query words must appear as whole words
                 words = _re.findall(r'\b\w+\b', q_lower)
@@ -336,6 +588,8 @@ def search(query: str, limit: int = 10, user_id: Optional[str] = None):
                 for i, page_text in enumerate(raw_pages, start=1):
                     if q_lower in page_text.lower():
                         pages_found.append(i)
+                    elif any(w in page_text.lower() for w in words if len(w) >= 3):
+                        pages_found.append(i)
 
                 idx = text_lower.find(q_lower)
                 if idx != -1:
@@ -344,6 +598,20 @@ def search(query: str, limit: int = 10, user_id: Optional[str] = None):
                     context_snippet = ("..." if start > 0 else "") + \
                                       doc.cleanedText[start:end].strip() + \
                                       ("..." if end < len(doc.cleanedText) else "")
+                elif words:
+                    # Fallback to the first matched word
+                    first_idx = -1
+                    for w in words:
+                        if len(w) < 3: continue
+                        w_idx = text_lower.find(w)
+                        if w_idx != -1 and (first_idx == -1 or w_idx < first_idx):
+                            first_idx = w_idx
+                    if first_idx != -1:
+                        start = max(0, first_idx - 80)
+                        end   = min(len(doc.cleanedText), first_idx + 160)
+                        context_snippet = ("..." if start > 0 else "") + \
+                                          doc.cleanedText[start:end].strip() + \
+                                          ("..." if end < len(doc.cleanedText) else "")
 
             results.append({
                 "document_id": str(h.document_id),
@@ -364,9 +632,13 @@ def search(query: str, limit: int = 10, user_id: Optional[str] = None):
 # ---------------------------------------------------------------------------
 
 @app.delete("/delete/{document_id}")
-def delete(document_id: str):
+def delete(document_id: str, user_id: str = Depends(require_auth)):
     try:
         uid    = UUID(document_id)
+        doc = _engine.documents.get(uid)
+        if doc and getattr(doc, "ownerId", None) != user_id:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        
         result = _app.delete(uid)
         return {
             "document_id":    str(result.document_id),
@@ -377,6 +649,8 @@ def delete(document_id: str):
         }
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid document ID format")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -409,10 +683,12 @@ def metrics():
     }
 
 @app.get("/documents")
-def list_documents():
-    """List all indexed documents."""
+def list_documents(user_id: str = Depends(require_auth)):
+    """List all indexed documents for the current user."""
     docs = []
     for doc_id, doc in _engine.documents.items():
+        if getattr(doc, "ownerId", None) != user_id:
+            continue
         # Try to get storage URL
         try:
             url = _storage.get_url(doc_id)
@@ -447,13 +723,16 @@ def list_documents():
     return {"count": len(docs), "documents": docs}
 
 @app.get("/documents/{document_id}")
-def get_document(document_id: str):
+def get_document(document_id: str, user_id: str = Depends(require_auth)):
     """Retrieve full details of a single indexed document."""
     try:
         uid = UUID(document_id)
         if uid not in _engine.documents:
             raise HTTPException(status_code=404, detail="Document not found")
         doc = _engine.documents[uid]
+        if getattr(doc, "ownerId", None) != user_id:
+            raise HTTPException(status_code=403, detail="Forbidden")
+            
         try:
             url = _storage.get_url(uid)
         except Exception:

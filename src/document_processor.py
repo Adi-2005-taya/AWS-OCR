@@ -1,4 +1,4 @@
-"""Document processor for OCR Document Extraction System
+"""Document processor for DocuSense System
 
 This module orchestrates the document processing pipeline:
 1. Validate document status
@@ -201,12 +201,18 @@ class DocumentProcessor:
                     document_id=str(document_id)
                 )
                 
+                # Inject content type into metadata so web.py can serve it with the right mime type
+                final_metadata = ocr_result.metadata.copy()
+                if hasattr(document, 'contentType'):
+                    final_metadata['contentType'] = document.contentType
+
                 indexed_doc = IndexedDocument(
                     documentId=document_id,
                     cleanedText=cleaned_text,
                     keywords=keywords,
                     searchableContent=cleaned_text.lower(),
-                    metadata=ocr_result.metadata,  # carries per-page text
+                    metadata=final_metadata,  # carries per-page text and content type
+                    ownerId=getattr(document, "ownerId", None),
                 )
                 
                 self.search_engine.index(indexed_doc)

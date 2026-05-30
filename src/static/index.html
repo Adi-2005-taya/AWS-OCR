@@ -1,11 +1,35 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<!-- ═══ Anti-FOUC: apply saved theme BEFORE first paint ═══ -->
+<script>
+(function(){
+  try {
+    // Default new visitors to 'laser' (our recommended theme)
+    // so they never see the pink aurora flash on first load
+    var t = localStorage.getItem('theme') || 'laser';
+    document.documentElement.setAttribute('data-theme', t);
+    /* For laser theme: inject critical CSS immediately so the aurora
+       canvas is hidden and body is transparent from frame 0, before
+       any stylesheet has even been parsed. */
+    if (t === 'laser') {
+      var s = document.createElement('style');
+      s.textContent = 'body,html{background:transparent!important}#bg-canvas,#fx-canvas{display:none!important}#laser-flow-container{display:block!important;background:#1a052e}';
+      document.head.appendChild(s);
+    }
+  } catch(e) {}
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.scrollTo(0, 0);
+})();
+</script>
+<link rel="icon" href="/static/docusense-logo.jpg" type="image/jpeg">
+<meta property="og:image" content="/static/docusense-logo.jpg">
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>OCR Document Extraction</title>
+<title>DocuSense</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════
    PURPLE GALAXY THEME — CSS VARIABLES
@@ -71,6 +95,11 @@ body{
   background:var(--bg);color:var(--text);
   min-height:100vh;overflow-x:hidden;
   transition:background .4s,color .4s;
+}
+/* Laser theme: body must be transparent so the WebGL canvas shows through */
+[data-theme="laser"] html,
+[data-theme="laser"] body {
+  background: transparent !important;
 }
 
 /* ═══════════════════════════════════════════
@@ -169,6 +198,126 @@ header::after{
   box-shadow:0 0 16px rgba(168,85,247,.25);
 }
 .theme-thumb{font-size:.9rem;transition:transform .4s}
+</style>
+<style>
+/* ═══════════════════════════════════════════
+   THEME PICKER MODAL
+═══════════════════════════════════════════ */
+#theme-picker-overlay{
+  position:fixed;inset:0;z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0);
+  pointer-events:none;
+  transition:background .4s;
+}
+#theme-picker-overlay.open{
+  background:rgba(0,0,0,.75);
+  pointer-events:all;
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}
+#theme-picker-modal{
+  background:rgba(10,4,22,.97);
+  border:1px solid rgba(168,85,247,.35);
+  border-radius:28px;
+  padding:2.5rem 2rem 2rem;
+  width:min(760px,95vw);
+  box-shadow:0 0 80px rgba(168,85,247,.25),0 40px 80px rgba(0,0,0,.6);
+  transform:scale(.88) translateY(30px);
+  opacity:0;
+  transition:transform .45s cubic-bezier(.34,1.56,.64,1), opacity .35s ease;
+  position:relative;
+}
+#theme-picker-overlay.open #theme-picker-modal{
+  transform:scale(1) translateY(0);
+  opacity:1;
+}
+#theme-picker-modal h2{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:1.4rem;font-weight:700;
+  background:linear-gradient(90deg,#a855f7,#e879f9,#818cf8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  text-align:center;margin-bottom:.4rem;
+}
+#theme-picker-modal .picker-sub{
+  text-align:center;color:#7c6fa0;font-size:.82rem;margin-bottom:2rem;
+  letter-spacing:.02em;
+}
+.theme-cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+  gap:1rem;
+  margin-bottom:1.8rem;
+}
+.theme-card{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(168,85,247,.2);
+  border-radius:18px;
+  padding:1.2rem .8rem 1rem;
+  cursor:pointer;
+  text-align:center;
+  transition:all .28s cubic-bezier(.34,1.56,.64,1);
+  position:relative;
+  user-select:none;
+}
+.theme-card:hover{
+  transform:translateY(-6px) scale(1.04);
+  border-color:var(--tc-accent);
+  box-shadow:0 0 28px var(--tc-glow), 0 12px 30px rgba(0,0,0,.4);
+  background:rgba(255,255,255,.08);
+}
+.theme-card.active-theme{
+  border-color:var(--tc-accent);
+  box-shadow:0 0 20px var(--tc-glow);
+  background:rgba(255,255,255,.07);
+}
+.theme-card.recommended{
+  border-color:#FF79C6;
+  box-shadow:0 0 30px rgba(255,121,198,.3);
+}
+.tc-badge{
+  position:absolute;top:-10px;left:50%;transform:translateX(-50%);
+  background:linear-gradient(90deg,#FF79C6,#bd93f9);
+  color:#fff;font-size:.6rem;font-weight:700;
+  padding:.18rem .65rem;border-radius:20px;
+  letter-spacing:.08em;text-transform:uppercase;
+  white-space:nowrap;
+  box-shadow:0 2px 12px rgba(255,121,198,.4);
+  animation:badgePop .5s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes badgePop{from{transform:translateX(-50%) scale(0)}to{transform:translateX(-50%) scale(1)}}
+.tc-swatch{
+  width:52px;height:52px;border-radius:50%;
+  margin:0 auto .85rem;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.5rem;
+  box-shadow:0 0 20px var(--tc-glow);
+  transition:transform .3s;
+}
+.theme-card:hover .tc-swatch{ transform:scale(1.15) rotate(8deg); }
+.tc-name{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:.82rem;font-weight:600;
+  color:#ede9fe;margin-bottom:.25rem;
+}
+.tc-desc{
+  font-size:.68rem;color:#7c6fa0;line-height:1.4;
+}
+.picker-close-row{
+  display:flex;justify-content:center;gap:1rem;
+}
+.picker-close-btn{
+  background:rgba(168,85,247,.1);
+  border:1px solid rgba(168,85,247,.3);
+  color:#a855f7;border-radius:14px;
+  padding:.55rem 1.6rem;cursor:pointer;
+  font-size:.82rem;font-weight:600;font-family:'Inter',sans-serif;
+  transition:all .25s;
+}
+.picker-close-btn:hover{
+  background:rgba(168,85,247,.2);
+  box-shadow:0 0 16px rgba(168,85,247,.3);
+}
 </style>
 <style>
 /* ═══════════════════════════════════════════
@@ -728,11 +877,590 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
 }
 </style>
 
+<style>
+/* From Uiverse.io by Nawsome */
+.wheel-and-hamster {
+  --dur: 1s;
+  position: relative;
+  width: 12em;
+  height: 12em;
+  font-size: 14px;
+}
+.wheel,
+.hamster,
+.hamster div,
+.spoke {
+  position: absolute;
+}
+.wheel,
+.spoke {
+  border-radius: 50%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.wheel {
+  background: radial-gradient(100% 100% at center,hsla(0,0%,60%,0) 47.8%,hsl(0,0%,60%) 48%);
+  z-index: 2;
+}
+.hamster {
+  animation: hamster var(--dur) ease-in-out infinite;
+  top: 50%;
+  left: calc(50% - 3.5em);
+  width: 7em;
+  height: 3.75em;
+  transform: rotate(4deg) translate(-0.8em,1.85em);
+  transform-origin: 50% 0;
+  z-index: 1;
+}
+.hamster__head {
+  animation: hamsterHead var(--dur) ease-in-out infinite;
+  background: hsl(30,90%,55%);
+  border-radius: 70% 30% 0 100% / 40% 25% 25% 60%;
+  box-shadow: 0 -0.25em 0 hsl(30,90%,80%) inset,
+		0.75em -1.55em 0 hsl(30,90%,90%) inset;
+  top: 0;
+  left: -2em;
+  width: 2.75em;
+  height: 2.5em;
+  transform-origin: 100% 50%;
+}
+.hamster__ear {
+  animation: hamsterEar var(--dur) ease-in-out infinite;
+  background: hsl(0,90%,85%);
+  border-radius: 50%;
+  box-shadow: -0.25em 0 hsl(30,90%,55%) inset;
+  top: -0.25em;
+  right: -0.25em;
+  width: 0.75em;
+  height: 0.75em;
+  transform-origin: 50% 75%;
+}
+.hamster__eye {
+  animation: hamsterEye var(--dur) linear infinite;
+  background-color: hsl(0,0%,0%);
+  border-radius: 50%;
+  top: 0.375em;
+  left: 1.25em;
+  width: 0.5em;
+  height: 0.5em;
+}
+.hamster__nose {
+  background: hsl(0,90%,75%);
+  border-radius: 35% 65% 85% 15% / 70% 50% 50% 30%;
+  top: 0.75em;
+  left: 0;
+  width: 0.2em;
+  height: 0.25em;
+}
+.hamster__body {
+  animation: hamsterBody var(--dur) ease-in-out infinite;
+  background: hsl(30,90%,90%);
+  border-radius: 50% 30% 50% 30% / 15% 60% 40% 40%;
+  box-shadow: 0.1em 0.75em 0 hsl(30,90%,55%) inset,
+		0.15em -0.5em 0 hsl(30,90%,80%) inset;
+  top: 0.25em;
+  left: 2em;
+  width: 4.5em;
+  height: 3em;
+  transform-origin: 17% 50%;
+  transform-style: preserve-3d;
+}
+.hamster__limb--fr,
+.hamster__limb--fl {
+  clip-path: polygon(0 0,100% 0,70% 80%,60% 100%,0% 100%,40% 80%);
+  top: 2em;
+  left: 0.5em;
+  width: 1em;
+  height: 1.5em;
+  transform-origin: 50% 0;
+}
+.hamster__limb--fr {
+  animation: hamsterFRLimb var(--dur) linear infinite;
+  background: linear-gradient(hsl(30,90%,80%) 80%,hsl(0,90%,75%) 80%);
+  transform: rotate(15deg) translateZ(-1px);
+}
+.hamster__limb--fl {
+  animation: hamsterFLLimb var(--dur) linear infinite;
+  background: linear-gradient(hsl(30,90%,90%) 80%,hsl(0,90%,85%) 80%);
+  transform: rotate(15deg);
+}
+.hamster__limb--br,
+.hamster__limb--bl {
+  border-radius: 0.75em 0.75em 0 0;
+  clip-path: polygon(0 0,100% 0,100% 30%,70% 90%,70% 100%,30% 100%,40% 90%,0% 30%);
+  top: 1em;
+  left: 2.8em;
+  width: 1.5em;
+  height: 2.5em;
+  transform-origin: 50% 30%;
+}
+.hamster__limb--br {
+  animation: hamsterBRLimb var(--dur) linear infinite;
+  background: linear-gradient(hsl(30,90%,80%) 90%,hsl(0,90%,75%) 90%);
+  transform: rotate(-25deg) translateZ(-1px);
+}
+.hamster__limb--bl {
+  animation: hamsterBLLimb var(--dur) linear infinite;
+  background: linear-gradient(hsl(30,90%,90%) 90%,hsl(0,90%,85%) 90%);
+  transform: rotate(-25deg);
+}
+.hamster__tail {
+  animation: hamsterTail var(--dur) linear infinite;
+  background: hsl(0,90%,85%);
+  border-radius: 0.25em 50% 50% 0.25em;
+  box-shadow: 0 -0.2em 0 hsl(0,90%,75%) inset;
+  top: 1.5em;
+  right: -0.5em;
+  width: 1em;
+  height: 0.5em;
+  transform: rotate(30deg) translateZ(-1px);
+  transform-origin: 0.25em 0.25em;
+}
+.spoke {
+  animation: spoke var(--dur) linear infinite;
+  background: radial-gradient(100% 100% at center,hsl(0,0%,60%) 4.8%,hsla(0,0%,60%,0) 5%),
+		linear-gradient(hsla(0,0%,55%,0) 46.9%,hsl(0,0%,65%) 47%,hsl(0,0%,65%) 52.9%,hsla(0,0%,65%,0) 53%) 50% 50% / 99% 99% no-repeat;
+}
+@keyframes hamster {
+  from, to { transform: rotate(4deg) translate(-0.8em,1.85em); }
+  50% { transform: rotate(0) translate(-0.8em,1.85em); }
+}
+@keyframes hamsterHead {
+  from, 25%, 50%, 75%, to { transform: rotate(0); }
+  12.5%, 37.5%, 62.5%, 87.5% { transform: rotate(8deg); }
+}
+@keyframes hamsterEye {
+  from, 90%, to { transform: scaleY(1); }
+  95% { transform: scaleY(0); }
+}
+@keyframes hamsterEar {
+  from, 25%, 50%, 75%, to { transform: rotate(0); }
+  12.5%, 37.5%, 62.5%, 87.5% { transform: rotate(12deg); }
+}
+@keyframes hamsterBody {
+  from, 25%, 50%, 75%, to { transform: rotate(0); }
+  12.5%, 37.5%, 62.5%, 87.5% { transform: rotate(-2deg); }
+}
+@keyframes hamsterFRLimb {
+  from, 25%, 50%, 75%, to { transform: rotate(50deg) translateZ(-1px); }
+  12.5%, 37.5%, 62.5%, 87.5% { transform: rotate(-30deg) translateZ(-1px); }
+}
+@keyframes hamsterFLLimb {
+  from, 25%, 50%, 75%, to { transform: rotate(-30deg); }
+  12.5%, 37.5%, 62.5%, 87.5% { transform: rotate(50deg); }
+}
+@keyframes hamsterBRLimb {
+  from, 25%, 50%, 75%, to { transform: rotate(-60deg) translateZ(-1px); }
+  12.5%, 37.5%, 62.5%, 87.5% { transform: rotate(20deg) translateZ(-1px); }
+}
+@keyframes hamsterBLLimb {
+  from, 25%, 50%, 75%, to { transform: rotate(20deg); }
+  12.5%, 37.5%, 62.5%, 87.5% { transform: rotate(-60deg); }
+}
+@keyframes hamsterTail {
+  from, 25%, 50%, 75%, to { transform: rotate(30deg) translateZ(-1px); }
+  12.5%, 37.5%, 62.5%, 87.5% { transform: rotate(10deg) translateZ(-1px); }
+}
+@keyframes spoke {
+  from { transform: rotate(0); }
+  to { transform: rotate(-1turn); }
+}
+
+/* Skiper Theme Toggle SVG States */
+html:not([data-theme="light"]) #theme-icon-mask {
+  transform: translateY(10px) translateX(-12px);
+}
+html:not([data-theme="light"]) #theme-icon-circle {
+  r: 10px;
+}
+html:not([data-theme="light"]) #theme-icon-rays {
+  transform: rotate(-100deg) scale(0.5);
+  opacity: 0;
+}
+html[data-theme="light"] #theme-icon-mask {
+  transform: translateY(0px) translateX(0px);
+}
+html[data-theme="light"] #theme-icon-circle {
+  r: 8px;
+}
+html[data-theme="light"] #theme-icon-rays {
+  transform: rotate(0deg) scale(1);
+  opacity: 1;
+}
+
+/* Tooltip for theme button */
+.tooltip-container .tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  width: auto;
+  min-width: 65px;
+  background-color: var(--surface2);
+  color: var(--text);
+  text-align: center;
+  border-radius: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  position: absolute;
+  z-index: 101;
+  top: 130%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-5px);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 10px 24px var(--shadow);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.tooltip-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+/* Stairs style word preloader */
+#stairs-preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: flex;
+}
+.stair {
+  flex: 1;
+  height: 100vh;
+  background: #050505;
+  transition: transform 0.8s cubic-bezier(0.7, 0, 0.3, 1);
+}
+#stairs-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  pointer-events: none;
+}
+#preloader-word {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.word-show {
+  opacity: 1 !important;
+}
+.stairs-hidden .stair:nth-child(odd) {
+  transform: translateY(-100%);
+}
+.stairs-hidden .stair:nth-child(even) {
+  transform: translateY(100%);
+}
+.stairs-hidden .stair:nth-child(1) { transition-delay: 0s; }
+.stairs-hidden .stair:nth-child(2) { transition-delay: 0.08s; }
+.stairs-hidden .stair:nth-child(3) { transition-delay: 0.16s; }
+.stairs-hidden .stair:nth-child(4) { transition-delay: 0.24s; }
+.stairs-hidden .stair:nth-child(5) { transition-delay: 0.32s; }
+.stairs-hidden-container {
+  pointer-events: none !important;
+}
+.stairs-hidden #stairs-content {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+/* Edge Lighting */
+.edge-lighting {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  box-shadow: inset 0 0 50px 10px rgba(197, 84, 255, 0.4), 
+              inset 0 0 100px 20px rgba(82, 196, 255, 0.3);
+  animation: edgePulse 3s ease-in-out infinite alternate;
+}
+@keyframes edgePulse {
+  0% { box-shadow: inset 0 0 30px 5px rgba(255, 84, 130, 0.2), inset 0 0 60px 10px rgba(82, 196, 255, 0.2); }
+  100% { box-shadow: inset 0 0 60px 15px rgba(197, 84, 255, 0.5), inset 0 0 120px 25px rgba(82, 196, 255, 0.4); }
+}
+
+/* Scroll Reveal Animation */
+@keyframes slideUpReveal {
+  from {
+    opacity: 0;
+    transform: translateY(120px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.card.reveal-hidden {
+  opacity: 0;
+}
+.card.reveal-visible {
+  animation: slideUpReveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+</style>
+
+<style>
+/* --- LIGHTBOX --- */
+#lightbox-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  z-index: 100000; display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.4s cubic-bezier(.34,1.56,.64,1);
+}
+#lightbox-overlay.open { opacity: 1; pointer-events: auto; }
+.lightbox-content {
+  max-width: 90vw; max-height: 90vh; border-radius: 12px; box-shadow: 0 20px 80px rgba(168,85,247,0.4);
+  transform: scale(0.8) translateY(40px); transition: transform 0.4s cubic-bezier(.34,1.56,.64,1);
+  object-fit: contain; border: 1px solid rgba(168,85,247,0.3);
+}
+#lightbox-pdf { width: 98vw; height: 96vh; max-width: none; max-height: none; background: #fff; border-radius: 8px; margin-top: 2vh; }
+#lightbox-overlay.open .lightbox-content { transform: scale(1) translateY(0); }
+.lightbox-close {
+  position: absolute; top: 2rem; right: 2rem; width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(168,85,247,0.15); color: #fff; border: 1px solid rgba(168,85,247,0.3);
+  font-size: 1.5rem; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: all 0.3s; z-index: 100001;
+}
+.lightbox-close:hover { background: rgba(168,85,247,0.4); transform: rotate(90deg); }
+
+/* --- DOWNLOAD BUTTON --- */
+.btn-download {
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  width: 100%; padding: 0.8rem; margin-top: 1.5rem; border-radius: 10px;
+  background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(124,58,237,0.1));
+  border: 1px solid var(--p1); color: var(--p1); font-weight: 600; font-family: 'Space Grotesk', sans-serif;
+  cursor: pointer; position: relative; overflow: hidden; transition: all 0.3s;
+  box-shadow: 0 0 15px rgba(168,85,247,0.1); text-decoration: none;
+}
+.btn-download:hover {
+  background: var(--p1); color: #fff; box-shadow: 0 0 30px rgba(168,85,247,0.4);
+  transform: translateY(-2px);
+}
+.btn-download::before {
+  content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+.btn-download:hover::before { left: 100%; }
+
+/* --- VIEW ORIGINAL BUTTON --- */
+.btn-view-original {
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  width: 100%; padding: 0.8rem; margin-top: 0.5rem; border-radius: 10px;
+  background: transparent;
+  border: 1px solid rgba(168,85,247,0.3); color: var(--text); font-weight: 600; font-family: 'Space Grotesk', sans-serif;
+  cursor: pointer; transition: all 0.3s;
+}
+.btn-view-original:hover {
+  border-color: var(--p1); background: rgba(168,85,247,0.1);
+}
+
+/* --- DRAG DROP ENHANCEMENTS --- */
+.drop-zone.drag-over {
+  border: 2px solid var(--p1); background: rgba(168,85,247,0.15);
+  box-shadow: 0 0 40px rgba(168,85,247,0.3), inset 0 0 40px rgba(168,85,247,0.1);
+}
+.drop-zone.drag-over .dz-icon {
+  animation: dropIconDown 0.4s forwards;
+}
+@keyframes dropIconDown {
+  to { transform: translateY(15px) scale(1.2); color: var(--p1); text-shadow: 0 0 15px var(--p1); }
+}
+
+/* --- SKELETON LOADERS --- */
+.skeleton-card {
+  display: flex; align-items: center; gap: 1rem;
+  background: rgba(168,85,247,0.02); border: 1px solid rgba(168,85,247,0.1);
+  border-radius: 14px; padding: 0.85rem 1rem; margin-bottom: 0.6rem;
+  position: relative; overflow: hidden;
+}
+.skeleton-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(168,85,247,0.08), transparent);
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.skel-icon { width: 34px; height: 34px; border-radius: 8px; background: rgba(168,85,247,0.1); }
+.skel-lines { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.skel-line { height: 12px; border-radius: 6px; background: rgba(168,85,247,0.1); }
+.skel-line.w-40 { width: 40%; }
+.skel-line.w-80 { width: 80%; }
+.skel-line.w-20 { width: 20%; }
+
+/* --- EMPTY STATE ANIMATION --- */
+.empty-state-wrap {
+  text-align: center; padding: 3rem 1rem;
+  animation: fadeUp 0.5s ease both;
+}
+.es-svg {
+  width: 80px; height: 80px; margin: 0 auto 1rem;
+  filter: drop-shadow(0 10px 20px rgba(168,85,247,0.3));
+  animation: floatFolder 4s ease-in-out infinite;
+}
+.es-svg path { fill: url(#esGrad); }
+@keyframes floatFolder { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+.es-title { font-family: 'Space Grotesk', sans-serif; font-size: 1.1rem; color: var(--text); font-weight: 700; margin-bottom: 0.4rem; }
+.es-sub { font-size: 0.82rem; color: var(--muted); }
+
+/* --- TOAST PROGRESS --- */
+.toast-progress-wrap {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+  background: rgba(168,85,247,0.1); border-radius: 0 0 14px 14px; overflow: hidden;
+}
+.toast-progress-bar {
+  height: 100%; background: linear-gradient(90deg, #a855f7, #e879f9); width: 100%;
+}
+.toast-progress-bar.animate {
+  animation: drainToast var(--toast-dur, 3s) linear forwards;
+}
+@keyframes drainToast { from { width: 100%; } to { width: 0%; } }
+  #toast { padding-bottom: 1.2rem; } /* Make room for the bar */
+  
+  </style>
+
+<style>
+/* ═══════════════════════════════════════════
+   STRUCTURAL THEME OVERRIDES
+═══════════════════════════════════════════ */
+
+
+/* --- MATRIX (Pure Terminal) --- */
+[data-theme="matrix"] .card, [data-theme="matrix"] .search-bar {
+  background: transparent !important;
+  border: none !important;
+  border-left: 2px solid var(--p1) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding-left: 1.5rem !important;
+}
+[data-theme="matrix"] .card-glow { display: none !important; }
+[data-theme="matrix"] .btn {
+  background: #000 !important;
+  border: 1px dashed var(--p1) !important;
+  border-radius: 0 !important;
+  color: var(--p1) !important;
+  box-shadow: none !important;
+}
+[data-theme="matrix"] .result {
+  background: transparent !important;
+  border: 1px dotted var(--p1) !important;
+  border-radius: 0 !important;
+}
+[data-theme="matrix"] .drop-zone { background: transparent !important; border: 1px dashed var(--p1) !important; border-radius: 0 !important; }
+
+/* --- WARP (Extreme Glassmorphism) --- */
+[data-theme="warp"] .card, [data-theme="warp"] .search-bar {
+  border-radius: 40px !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  background: rgba(0,20,40,0.3) !important;
+  border: 1px solid rgba(0,255,255,0.3) !important;
+  box-shadow: 0 8px 32px rgba(0,255,255,0.1) !important;
+}
+[data-theme="warp"] .btn {
+  border-radius: 30px !important;
+  backdrop-filter: blur(8px) !important;
+}
+[data-theme="warp"] .result { border-radius: 20px !important; }
+[data-theme="warp"] .drop-zone { border-radius: 40px !important; }
+
+/* --- LASER (LaserFlow Background) --- */
+:root[data-theme="laser"]{
+  --bg:#1a052e;--surface:rgba(20,15,30,.3);--surface2:rgba(30,20,40,.3);
+  --border:rgba(255,121,198,.4);--border2:rgba(255,121,198,.6);
+  --text:#f8f8f2;--muted:#bd93f9;--shadow:rgba(255,121,198,.3);
+  --header-bg:rgba(18,15,23,.8);
+  --p1:#FF79C6;--p2:#bd93f9;--p3:#ffb86c;--p4:#ff79c6;--p5:#8be9fd;
+  --card-shine:rgba(255,121,198,.1);
+  --success:#50fa7b;--warning:#f1fa8c;--danger:#ff5555;
+  --grad:linear-gradient(135deg,#FF79C6,#bd93f9);
+  --grad2:linear-gradient(135deg,#bd93f9,#8be9fd);
+  --grad3:linear-gradient(135deg,#FF79C6,#ffb86c);
+}
+[data-theme="laser"] #bg-canvas { display: none !important; }
+[data-theme="laser"] #fx-canvas  { display: none !important; }
+[data-theme="laser"] #laser-flow-container { display: block !important; background: #1a052e; }
+[data-theme="laser"] .card, [data-theme="laser"] .search-bar {
+  border-radius: 20px !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  background: rgba(18,15,23,0.4) !important;
+  border: 1px solid rgba(255,121,198,0.4) !important;
+  box-shadow: 0 4px 20px rgba(255,121,198,0.15) !important;
+}
+[data-theme="laser"] .btn { border-radius: 12px !important; }
+</style>
+
 </head>
 <body>
 
+<!-- Stairs Preloader -->
+<div id="stairs-preloader">
+  <div class="stair"></div>
+  <div class="stair"></div>
+  <div class="stair"></div>
+  <div class="stair"></div>
+  <div class="stair"></div>
+  <div id="stairs-content">
+    <div class="edge-lighting"></div>
+    <span id="preloader-word"></span>
+  </div>
+</div>
+<script>
+(function(){
+  const preloader = document.getElementById('stairs-preloader');
+  
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('skip_preloader') === 'true') {
+    preloader.style.display = 'none';
+    // Remove the parameter from the URL so reloading plays it again
+    window.history.replaceState({}, document.title, window.location.pathname);
+    return;
+  }
+
+  const words = ["Hello", "নমস্কার", "হ্যালো", "Bonjour", "Hola", "Ciao", "Hallo", "Привет", "こんにちは", "안녕하세요", "Extracting..."];
+  let wordIndex = 0;
+  const wordEl = document.getElementById('preloader-word');
+  
+  function showNextWord() {
+    if (wordIndex >= words.length) {
+      setTimeout(() => {
+        preloader.classList.add('stairs-hidden');
+        preloader.classList.add('stairs-hidden-container');
+        setTimeout(() => preloader.remove(), 1500);
+      }, 300);
+      return;
+    }
+    wordEl.textContent = words[wordIndex];
+    wordEl.classList.add('word-show');
+    
+    setTimeout(() => {
+      wordEl.classList.remove('word-show');
+      wordIndex++;
+      setTimeout(showNextWord, 150);
+    }, 280);
+  }
+  
+  // Disable scrolling during preloader
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => {
+    document.body.style.overflow = '';
+  }, (words.length * 430) + 1200);
+  
+  setTimeout(showNextWord, 100);
+})();
+</script>
+
 <!-- Aurora / background canvas -->
 <canvas id="bg-canvas"></canvas>
+<!-- LaserFlow background container -->
+<div id="laser-flow-container" style="position:fixed;inset:0;z-index:-4;pointer-events:none;display:none;"></div>
 <!-- FX overlay canvas -->
 <canvas id="fx-canvas" style="position:fixed;inset:0;z-index:-2;pointer-events:none"></canvas>
 
@@ -757,21 +1485,101 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
 
 <!-- ══ HEADER ══ -->
 <header>
-  <div class="logo">
-    <div class="logo-icon">✦</div>
-    <div class="logo-text">
-      <h1>OCR Document Extraction</h1>
-      <p>AI-powered text extraction &amp; search</p>
+  <div class="logo" style="display: flex; align-items: center; gap: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <img src="/static/docusense-logo.jpg" alt="DocuSense Logo" class="logo-icon" style="object-fit: cover;">
+      <div class="logo-text">
+        <h1>DocuSense</h1>
+        <p>AI-powered text extraction &amp; search</p>
+      </div>
     </div>
+    <a href="/about" style="text-decoration: none;">
+      <button class="btn" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: var(--p1); padding: 4px 12px; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">About</button>
+    </a>
   </div>
   <div class="header-right">
     <div class="online-pill"><div class="online-dot"></div><span id="online-label">Online</span></div>
-    <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">
-      <span class="theme-thumb" id="toggle-thumb">🌙</span>
-      <span id="theme-label">Dark</span>
+
+    <!-- User avatar + name (populated by JS on load) -->
+    <div id="user-chip" style="display:none; align-items:center; gap:.55rem;
+         background:rgba(168,85,247,.08); border:1px solid rgba(168,85,247,.25);
+         border-radius:20px; padding:.28rem .9rem .28rem .45rem; cursor:default;">
+      <div id="user-avatar" style="width:26px;height:26px;border-radius:50%;
+           background:linear-gradient(135deg,#a855f7,#7c3aed);
+           display:flex;align-items:center;justify-content:center;
+           font-size:.78rem;font-weight:700;color:#fff;flex-shrink:0;"></div>
+      <span id="user-name" style="font-size:.78rem;font-weight:600;color:var(--p1);
+            max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    </div>
+
+    <!-- Logout button -->
+    <a href="/auth/logout" id="logout-btn" style="display:none; text-decoration:none;">
+      <button class="btn" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);
+              color:#f87171;padding:4px 12px;font-size:.82rem;border-radius:6px;cursor:pointer;
+              transition:all .2s;"
+        onmouseover="this.style.background='rgba(239,68,68,.18)'"
+        onmouseout="this.style.background='rgba(239,68,68,.08)'">
+        Sign Out
+      </button>
+    </a>
+
+    <button class="theme-btn tooltip-container" onclick="toggleTheme()" id="theme-btn" style="position: relative; overflow: visible; padding: 0.5rem; justify-content: center; width: 38px; height: 38px; border-radius: 50%;">
+      <svg
+        id="theme-icon-svg"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        fill="currentColor"
+        stroke-linecap="round"
+        viewBox="0 0 32 32"
+        style="width: 22px; height: 22px; transition: all 0.35s ease-in-out;"
+      >
+        <clipPath id="skiper-btn-2">
+          <path id="theme-icon-mask" style="transition: all 0.35s ease-in-out;" d="M0-5h30a1 1 0 0 0 9 13v24H0Z" />
+        </clipPath>
+        <g clip-path="url(#skiper-btn-2)">
+          <circle id="theme-icon-circle" style="transition: all 0.35s ease-in-out;" cx="16" cy="16" r="8" />
+          <g id="theme-icon-rays" style="transition: all 0.35s ease-in-out; transform-origin: center;" stroke="currentColor" stroke-width="1.5">
+            <path d="M16 5.5v-4" />
+            <path d="M16 30.5v-4" />
+            <path d="M1.5 16h4" />
+            <path d="M26.5 16h4" />
+            <path d="m23.4 8.6 2.8-2.8" />
+            <path d="m5.7 26.3 2.9-2.9" />
+            <path d="m5.8 5.8 2.8 2.8" />
+            <path d="m23.4 23.4 2.9 2.9" />
+          </g>
+        </g>
+      </svg>
+      <span class="tooltip-text" id="theme-tooltip">Dark</span>
     </button>
   </div>
 </header>
+
+<script>
+// Load user info from /me and populate header
+(async function(){
+  try {
+    const res = await fetch('/me');
+    const user = await res.json();
+    if(user.authenticated){
+      const chip = document.getElementById('user-chip');
+      const logoutBtn = document.getElementById('logout-btn');
+      const avatar = document.getElementById('user-avatar');
+      const nameEl = document.getElementById('user-name');
+      if(user.picture) {
+        avatar.style.background = 'url(' + user.picture + ') center/cover';
+        avatar.textContent = '';
+      } else {
+        const initial = (user.name||'?')[0].toUpperCase();
+        avatar.textContent = initial;
+      }
+      nameEl.textContent = user.name || user.email;
+      chip.style.display = 'flex';
+      logoutBtn.style.display = 'inline-flex';
+    }
+  } catch(e){}
+})();
+</script>
 
 <main>
 
@@ -857,6 +1665,26 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
     <span class="spinner" id="spin-upload"></span><span>Upload &amp; Process</span>
   </button>
   <div class="progress-bar" id="prog-upload"><div class="fill"></div></div>
+  <div id="hamster-loader" style="display: none; justify-content: center; margin: 1.5rem 0;">
+    <div aria-label="Orange and tan hamster running in a metal wheel" role="img" class="wheel-and-hamster">
+      <div class="wheel"></div>
+      <div class="hamster">
+        <div class="hamster__body">
+          <div class="hamster__head">
+            <div class="hamster__ear"></div>
+            <div class="hamster__eye"></div>
+            <div class="hamster__nose"></div>
+          </div>
+          <div class="hamster__limb hamster__limb--fr"></div>
+          <div class="hamster__limb hamster__limb--fl"></div>
+          <div class="hamster__limb hamster__limb--br"></div>
+          <div class="hamster__limb hamster__limb--bl"></div>
+          <div class="hamster__tail"></div>
+        </div>
+      </div>
+      <div class="spoke"></div>
+    </div>
+  </div>
   <div class="result" id="upload-result">Select a document to begin…</div>
 </div>
 
@@ -872,8 +1700,9 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
   <button class="btn btn-primary" onclick="checkStatus()" id="btn-status">
     <span class="spinner" id="spin-status"></span><span>Check Status</span>
   </button>
-  <div class="result" id="status-result">Enter a document ID to check status…</div>
+  <div id="status-result"></div>
 </div>
+
 
 <!-- ══ SEARCH DOCUMENTS ══ -->
 <div class="card full">
@@ -897,7 +1726,7 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
     <span class="spinner" id="spin-search"></span><span>Search</span>
   </button>
   <div class="progress-bar" id="prog-search"><div class="fill"></div></div>
-  <div id="search-result" class="result">Enter a query to search your documents…</div>
+  <div id="search-result"></div>
 </div>
 
 <!-- ══ MY DOCUMENTS ══ -->
@@ -927,7 +1756,7 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
   <button class="btn btn-danger" onclick="deleteDoc()" id="btn-delete">
     <span class="spinner" id="spin-delete"></span><span>Delete</span>
   </button>
-  <div class="result" id="delete-result">Enter a document ID to delete it…</div>
+  <div id="delete-result"></div>
 </div>
 
 <!-- ══ HEALTH CHECK ══ -->
@@ -942,6 +1771,8 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
   </button>
   <div id="health-grid"></div>
 </div>
+
+
 
 </main>
 
@@ -1747,6 +2578,13 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
 
   function draw(){
     const theme = document.documentElement.getAttribute('data-theme');
+    // In laser mode, clear canvas and do nothing — laser WebGL handles all visuals
+    if (theme === 'laser') {
+      ctx.clearRect(0, 0, W, H);
+      t++;
+      requestAnimationFrame(draw);
+      return;
+    }
     const isDark = theme !== 'light';
     ctx.clearRect(0, 0, W, H);
 
@@ -2077,39 +2915,70 @@ document.querySelectorAll('.card').forEach(card=>{
 /* ══════════════════════════════════════════════════════
    THEME TOGGLE — DARK / LIGHT / MATRIX
 ══════════════════════════════════════════════════════ */
+/* ── Theme Picker Modal ── */
 function toggleTheme(){
-  const html=document.documentElement;
-  const currentTheme=html.getAttribute('data-theme') || 'dark';
-  let next;
-  if(currentTheme === 'dark') next = 'light';
-  else if(currentTheme === 'light') next = 'matrix';
-  else if(currentTheme === 'matrix') next = 'warp';
-  else next = 'dark';
-  html.setAttribute('data-theme',next);
-  localStorage.setItem('theme',next);
-  updateThemeUI(next);
+  openThemePicker();
 }
+
+function openThemePicker(){
+  const overlay = document.getElementById('theme-picker-overlay');
+  if(overlay) overlay.classList.add('open');
+  // Mark currently active card
+  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+  document.querySelectorAll('.theme-card').forEach(c => {
+    c.classList.toggle('active-theme', c.dataset.theme === cur);
+  });
+}
+
+function closeThemePicker(){
+  const overlay = document.getElementById('theme-picker-overlay');
+  if(overlay) overlay.classList.remove('open');
+}
+
+function pickTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+  localStorage.setItem('theme-chosen', '1');
+  updateThemeUI(theme);
+  // Update active card highlight
+  document.querySelectorAll('.theme-card').forEach(c => {
+    c.classList.toggle('active-theme', c.dataset.theme === theme);
+  });
+  // Brief delay then close so user sees selection
+  setTimeout(closeThemePicker, 380);
+}
+
 function updateThemeUI(theme) {
-  const thumb = document.getElementById('toggle-thumb');
-  const label = document.getElementById('theme-label');
-  if(theme === 'dark') {
-    thumb.textContent = '🌙';
-    label.textContent = 'Dark';
-  } else if(theme === 'light') {
-    thumb.textContent = '☀️';
-    label.textContent = 'Light';
-  } else if(theme === 'matrix') {
-    thumb.textContent = '🖥️';
-    label.textContent = 'Matrix';
-  } else {
-    thumb.textContent = '🚀';
-    label.textContent = 'Warp';
-  }
+  const thumb   = document.getElementById('toggle-thumb');
+  const label   = document.getElementById('theme-label');
+  const tooltip = document.getElementById('theme-tooltip');
+
+  let text = 'Dark', icon = '🌙';
+  if(theme === 'dark')   { icon = '🌙'; text = 'Dark'; }
+  else if(theme === 'light')  { icon = '☀️';  text = 'Light'; }
+  else if(theme === 'matrix') { icon = '🖥️'; text = 'Matrix'; }
+  else if(theme === 'warp')   { icon = '🚀';  text = 'Warp'; }
+  else                        { icon = '✨';  text = 'Laser'; }
+
+  if(thumb)   thumb.textContent = icon;
+  if(label)   label.textContent = text;
+  if(tooltip) tooltip.textContent = text;
 }
+
 (function(){
-  const s=localStorage.getItem('theme')||'dark';
-  document.documentElement.setAttribute('data-theme',s);
+  // Default new visitors to 'laser' — saves to localStorage immediately
+  // so the anti-FOUC head script also picks it up on the next visit
+  var hadTheme = localStorage.getItem('theme');
+  const s = hadTheme || 'laser';
+  if (!hadTheme) {
+    try { localStorage.setItem('theme', 'laser'); } catch(e) {}
+  }
+  document.documentElement.setAttribute('data-theme', s);
   updateThemeUI(s);
+  // Show picker on first visit (after laser loads cleanly)
+  if(!localStorage.getItem('theme-chosen')){
+    window.addEventListener('load', () => setTimeout(openThemePicker, 1500));
+  }
 })();
 
 /* ══════════════════════════════════════════════════════
@@ -2130,8 +2999,11 @@ function setLoading(id,on){
   const btn=document.getElementById('btn-'+id);
   const sp=document.getElementById('spin-'+id);
   const pr=document.getElementById('prog-'+id);
-  btn.disabled=on;sp.style.display=on?'block':'none';
-  if(pr)pr.style.display=on?'block':'none';
+  const hl=document.getElementById('hamster-loader');
+  if(btn) btn.disabled=on;
+  if(sp) sp.style.display=on?'block':'none';
+  if(pr) pr.style.display=on?'block':'none';
+  if(id === 'upload' && hl) hl.style.display=on?'flex':'none';
 }
 function setResult(id,html,type=''){
   const el=document.getElementById(id+'-result')||document.getElementById(id);
@@ -2219,37 +3091,56 @@ async function uploadDoc(){
     const fd=new FormData();fd.append('file',file);
     const r=await fetch('/upload',{method:'POST',body:fd});
     const d=await r.json();
-    if(!r.ok){setResult('upload','⚠️ '+(d.detail||JSON.stringify(d)),'error');toast('Upload failed','err');return}
+    if(!r.ok){
+      setResult('upload','⚠️ '+(d.detail||JSON.stringify(d)),'error');
+      toast('Upload failed','err');
+      setLoading('upload',false);
+      return;
+    }
     if(d.duplicate){
       setResult('upload',`<b style="color:var(--warning)">⚠️ Already indexed</b>\n\nThis file was uploaded before.\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${d.document_id}</span>\n<b>Status:</b> <span class="tag INDEXED">INDEXED</span>`,'success');
       document.getElementById('status-id').value=d.document_id;
       document.getElementById('delete-id').value=d.document_id;
       toast('Already indexed — showing existing document');
       setTimeout(()=>openDocDrawer(d.document_id), 800);
+      setLoading('upload',false);
       return;
     }
     document.getElementById('status-id').value=d.document_id;
     document.getElementById('delete-id').value=d.document_id;
     toast('Document uploaded — starting live tracker');
+    
+    // Hand over to live tracker. Turn off only the button spin, leave hamster running!
+    const btn=document.getElementById('btn-upload');
+    const sp=document.getElementById('spin-upload');
+    if(btn) btn.disabled=false;
+    if(sp) sp.style.display='none';
+    
     trackStatusProgress(d.document_id);
-  }catch(e){setResult('upload','Network error: '+e,'error');toast('Network error','err')}
-  finally{setLoading('upload',false)}
+  }catch(e){
+    setResult('upload','Network error: '+e,'error');
+    toast('Network error','err');
+    setLoading('upload',false);
+  }
 }
 
 function trackStatusProgress(docId){
   const progBar=document.getElementById('prog-upload');
+  const hl=document.getElementById('hamster-loader');
   if(statusPollInterval)clearInterval(statusPollInterval);
   setResult('upload',`📥 <b>File Uploaded</b>\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${docId}</span>\n<b>Status:</b> <span class="tag UPLOADED">UPLOADED</span>\n\n⚙️ Starting OCR and indexation. Please wait...`,'success');
   if(progBar)progBar.style.display='block';
+  if(hl)hl.style.display='flex';
   statusPollInterval=setInterval(async()=>{
     try{
       const r=await fetch('/status/'+docId);const d=await r.json();
-      if(!r.ok){clearInterval(statusPollInterval);if(progBar)progBar.style.display='none';return}
+      if(!r.ok){clearInterval(statusPollInterval);if(progBar)progBar.style.display='none';if(hl)hl.style.display='none';return}
       if(d.status==='PROCESSING'){
         setResult('upload',`⚙️ <b>Processing OCR Service</b>\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${docId}</span>\n<b>Status:</b> <span class="tag PROCESSING">PROCESSING</span>\n\nExtracting text content from pages...`,'success');
       }else if(d.status==='INDEXED'){
         clearInterval(statusPollInterval);
         if(progBar)progBar.style.display='none';
+        if(hl)hl.style.display='none';
         setResult('upload',`✓ <b>Document Fully Indexed!</b>\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${docId}</span>\n<b>Status:</b> <span class="tag INDEXED">INDEXED</span>\n\nDocument text is now searchable.`,'success');
         toast('Document successfully indexed!');
         confettiBurst();
@@ -2260,12 +3151,14 @@ function trackStatusProgress(docId){
       }else if(d.status==='FAILED'){
         clearInterval(statusPollInterval);
         if(progBar)progBar.style.display='none';
+        if(hl)hl.style.display='none';
         setResult('upload',`❌ <b>Extraction Failed</b>\n<b>ID:</b> <span style="font-family:'Space Grotesk',sans-serif;color:var(--p1)">${docId}</span>\n<b>Status:</b> <span class="tag FAILED">FAILED</span>\n\n${d.error_details?JSON.stringify(d.error_details):'Unknown OCR error'}`,'error');
         toast('Extraction failed','err');
       }
     }catch(e){
       clearInterval(statusPollInterval);
       if(progBar)progBar.style.display='none';
+      if(hl)hl.style.display='none';
     }
   },1000);
 }
@@ -2438,6 +3331,8 @@ async function openDocDrawer(docId, initialPageIdx = 0){
   
   document.getElementById('drawer-filename').textContent="Loading details...";
   document.getElementById('drawer-doc-id').textContent=docId;
+  currentDrawerDocId = docId;
+  document.getElementById('btn-drawer-download').href = `/download/${docId}`;
   document.getElementById('drawer-pages').textContent="Pages: ...";
   document.getElementById('drawer-chars').textContent="Characters: ...";
   document.getElementById('drawer-date').textContent="Indexed on: ...";
@@ -2678,7 +3573,15 @@ document.head.appendChild(_cStyle);
     <div id="drawer-keywords" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1.5rem"></div>
 
     <label>Page Navigation</label>
-    <div id="drawer-page-nav" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1.25rem"></div>
+    
+<div id="drawer-page-nav" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1.25rem"></div>
+      <a href="#" id="btn-drawer-download" class="btn-download" download>
+        <span style="font-size:1.2rem;">&#10515;</span> Download Original
+      </a>
+      <button id="btn-drawer-preview" class="btn-view-original" onclick="openLightbox()">
+        <span style="font-size:1.1rem;">&#128065;</span> View Fullscreen
+      </button>
+
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
       <label style="margin-bottom:0">Extracted Text Content</label>
@@ -2688,6 +3591,150 @@ document.head.appendChild(_cStyle);
   </div>
 </div>
 <div id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const cards = document.querySelectorAll('.card');
+  // Initially hide them so they can be revealed
+  cards.forEach(card => card.classList.add('reveal-hidden'));
+
+  const observer = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.remove('reveal-hidden');
+        entry.target.classList.add('reveal-visible');
+        obs.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: "0px 0px -40px 0px" });
+
+  // Add a slight delay before observing so they don't immediately flash in if preloader is showing
+  setTimeout(() => {
+    cards.forEach(card => observer.observe(card));
+  }, 300);
+});
+</script>
+
+<div id="lightbox-overlay" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox(event)">&#10005;</button>
+  <img id="lightbox-img" class="lightbox-content" src="" alt="Document Preview" onclick="event.stopPropagation()" style="display:none;">
+  <iframe id="lightbox-pdf" class="lightbox-content" src="" onclick="event.stopPropagation()" style="display:none;"></iframe>
+</div>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="esGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#e879f9" />
+    </linearGradient>
+  </defs>
+</svg>
+
+
+<script>
+let currentDrawerDocId = null;
+
+function openLightbox() {
+  if(!currentDrawerDocId) return;
+  const overlay = document.getElementById('lightbox-overlay');
+  const filename = (document.getElementById('drawer-filename').textContent || '').toLowerCase();
+  
+  const img = document.getElementById('lightbox-img');
+  const pdf = document.getElementById('lightbox-pdf');
+  
+  if (filename.endsWith('.pdf')) {
+    img.style.display = 'none';
+    pdf.style.display = 'block';
+    pdf.src = `/download/${currentDrawerDocId}`;
+    overlay.style.backdropFilter = 'none';
+    overlay.style.webkitBackdropFilter = 'none';
+    overlay.style.background = 'rgba(0,0,0,0.95)';
+  } else {
+    pdf.style.display = 'none';
+    img.style.display = 'block';
+    img.src = `/download/${currentDrawerDocId}`;
+    overlay.style.backdropFilter = 'blur(12px)';
+    overlay.style.webkitBackdropFilter = 'blur(12px)';
+    overlay.style.background = 'rgba(0,0,0,0.85)';
+  }
+  
+  overlay.classList.add('open');
+}
+
+function closeLightbox(e) {
+  if(e) e.stopPropagation();
+  const overlay = document.getElementById('lightbox-overlay');
+  overlay.classList.remove('open');
+  setTimeout(() => { 
+    document.getElementById('lightbox-img').src = ''; 
+    document.getElementById('lightbox-pdf').src = ''; 
+  }, 400);
+}
+
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape') closeLightbox();
+});
+</script>
+<!-- ═══ THEME PICKER MODAL ═══ -->
+<div id="theme-picker-overlay" onclick="if(event.target===this)closeThemePicker()">
+  <div id="theme-picker-modal" role="dialog" aria-modal="true" aria-label="Choose a theme">
+    <h2>Choose Your Experience</h2>
+    <p class="picker-sub">Pick a visual theme — you can always change it later with the button in the header.</p>
+
+    <div class="theme-cards">
+
+      <!-- LASER — Recommended -->
+      <div class="theme-card recommended" data-theme="laser" onclick="pickTheme('laser')"
+           style="--tc-accent:#FF79C6;--tc-glow:rgba(255,121,198,.35);">
+        <span class="tc-badge">⭐ Recommended</span>
+        <div class="tc-swatch" style="background:linear-gradient(135deg,#1a052e,#FF79C6);">
+          ✨
+        </div>
+        <div class="tc-name">Laser</div>
+        <div class="tc-desc">Neon beam &amp; fog — cinematic &amp; immersive</div>
+      </div>
+
+      <!-- DARK -->
+      <div class="theme-card" data-theme="dark" onclick="pickTheme('dark')"
+           style="--tc-accent:#a855f7;--tc-glow:rgba(168,85,247,.35);">
+        <div class="tc-swatch" style="background:linear-gradient(135deg,#0a0514,#a855f7);">🌙</div>
+        <div class="tc-name">Dark</div>
+        <div class="tc-desc">Classic deep-space purple</div>
+      </div>
+
+      <!-- LIGHT -->
+      <div class="theme-card" data-theme="light" onclick="pickTheme('light')"
+           style="--tc-accent:#7c3aed;--tc-glow:rgba(124,58,237,.35);">
+        <div class="tc-swatch" style="background:linear-gradient(135deg,#f5f0ff,#7c3aed);">☀️</div>
+        <div class="tc-name">Light</div>
+        <div class="tc-desc">Clean &amp; bright lavender</div>
+      </div>
+
+      <!-- WARP -->
+      <div class="theme-card" data-theme="warp" onclick="pickTheme('warp')"
+           style="--tc-accent:#00ffff;--tc-glow:rgba(0,255,255,.3);">
+        <div class="tc-swatch" style="background:linear-gradient(135deg,#00081a,#00ffff);">🚀</div>
+        <div class="tc-name">Warp</div>
+        <div class="tc-desc">Cyberpunk cyan hyperspace</div>
+      </div>
+
+      <!-- MATRIX -->
+      <div class="theme-card" data-theme="matrix" onclick="pickTheme('matrix')"
+           style="--tc-accent:#00ff00;--tc-glow:rgba(0,255,0,.3);">
+        <div class="tc-swatch" style="background:linear-gradient(135deg,#000a00,#00ff00);">🖥️</div>
+        <div class="tc-name">Matrix</div>
+        <div class="tc-desc">Terminal green retro hacker</div>
+      </div>
+
+    </div><!-- /.theme-cards -->
+
+    <div class="picker-close-row">
+      <button class="picker-close-btn" onclick="closeThemePicker()">Maybe later</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/laser.js"></script>
 
 </body>
 </html>

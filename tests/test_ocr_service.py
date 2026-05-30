@@ -140,7 +140,12 @@ class TestTesseractOCRService:
         document_id = uuid4()
         
         # Extract text
-        result = service.extract_text(image_data, document_id)
+        try:
+            result = service.extract_text(image_data, document_id)
+        except OCRError as e:
+            if "tesseract is not installed" in str(e) or "not in your PATH" in str(e):
+                pytest.skip("tesseract binary not installed")
+            raise
         
         # Verify result structure
         assert isinstance(result, OCRResult)
@@ -184,6 +189,16 @@ class TestTesseractOCRService:
         document_id = uuid4()
         invalid_data = b"not an image"
         
+        # Check if tesseract binary is installed first
+        try:
+            dummy_img = Image.new('RGB', (1, 1), color='white')
+            dummy_bytes = BytesIO()
+            dummy_img.save(dummy_bytes, format='PNG')
+            service.extract_text(dummy_bytes.getvalue(), document_id)
+        except OCRError as e:
+            if "tesseract is not installed" in str(e) or "not in your PATH" in str(e):
+                pytest.skip("tesseract binary not installed")
+        
         with pytest.raises(OCRError) as exc_info:
             service.extract_text(invalid_data, document_id)
         
@@ -222,7 +237,7 @@ class TestOCRServiceFactory:
         )
         
         try:
-            service = OCRServiceFactory.create_service()
+            service = OCRServiceFactory.create_service(enable_rate_limiting=False)
             assert isinstance(service, TesseractOCRService)
         except OCRError as e:
             # Skip test if pytesseract is not installed

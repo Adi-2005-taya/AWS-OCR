@@ -1,4 +1,4 @@
-# Requirements Document
+﻿# Requirements Document
 
 ## Introduction
 
@@ -6,7 +6,7 @@ This document specifies the requirements for an automated OCR-based document tex
 
 ## Glossary
 
-- **System**: The OCR Document Extraction System
+- **System**: The DocuSense System
 - **Storage_Container**: Blob/object storage service for document images
 - **Storage_Monitor**: Event-driven service that detects new file uploads
 - **Document_Processor**: Orchestration service for the OCR workflow

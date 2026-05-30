@@ -1,4 +1,4 @@
-"""Validation utilities for OCR Document Extraction System
+﻿"""Validation utilities for DocuSense System
 
 This module provides validation functions for file uploads and other inputs.
 """

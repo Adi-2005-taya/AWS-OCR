@@ -1,4 +1,4 @@
-"""Application entry points for OCR Document Extraction System
+"""Application entry points for DocuSense System
 
 Wires all components together and exposes high-level handlers for:
 - Document upload
@@ -124,6 +124,7 @@ class OCRApplication:
         file_data: bytes,
         filename: str,
         content_type: str,
+        owner_id: str | None = None,
     ) -> UploadResult:
         """Upload a document and trigger async processing.
 
@@ -159,6 +160,7 @@ class OCRApplication:
             storageUrl=storage_url,
             contentType=content_type,
             status=DocumentStatus.UPLOADED,
+            ownerId=owner_id,
         )
 
         # Register with status manager
@@ -173,20 +175,28 @@ class OCRApplication:
             storage_url=storage_url,
         )
 
-        # Trigger storage monitor event (fires processing pipeline)
+        # Trigger storage monitor event (fires processing pipeline) in a background thread
+        # This makes the upload API non-blocking and instant
         from src.storage_monitor import UploadEvent
         from datetime import UTC, datetime
-        self._monitor.on_file_uploaded(
-            UploadEvent(
-                document_id=document_id,
-                filename=filename,
-                storage_url=storage_url,
-                content_type=content_type,
-                upload_timestamp=datetime.now(UTC),
-                metadata={},
-            )
+        import threading
+        
+        event = UploadEvent(
+            document_id=document_id,
+            filename=filename,
+            content_type=content_type,
+            upload_timestamp=datetime.now(UTC),
+            metadata={"source": "api_upload"},
+            owner_id=owner_id,
+            storage_url=storage_url,
         )
-
+        
+        threading.Thread(
+            target=self._monitor.on_file_uploaded,
+            args=(event,),
+            daemon=True
+        ).start()
+        
         return UploadResult(
             document_id=document_id,
             storage_url=storage_url,
@@ -302,6 +312,7 @@ class OCRApplication:
                 storageUrl=event.storage_url,
                 contentType=event.content_type,
                 status=DocumentStatus.UPLOADED,
+                ownerId=event.owner_id,
             )
 
         try:

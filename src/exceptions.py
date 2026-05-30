@@ -1,4 +1,4 @@
-"""Base exception classes for OCR Document Extraction System
+﻿"""Base exception classes for DocuSense System
 
 This module defines the exception hierarchy for the application,
 providing structured error handling across all components.

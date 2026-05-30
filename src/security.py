@@ -1,4 +1,4 @@
-"""Security features for OCR Document Extraction System
+﻿"""Security features for DocuSense System
 
 Provides TLS/SSL configuration helpers and secure connection utilities
 for storage and search service communications.

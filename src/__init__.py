@@ -1,4 +1,4 @@
-"""OCR Document Extraction System
+﻿"""DocuSense System
 
 An automated OCR-based document text extraction and search system.
 """

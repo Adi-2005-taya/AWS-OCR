@@ -1,4 +1,4 @@
-"""Query handler for OCR Document Extraction System
+﻿"""Query handler for DocuSense System
 
 This module provides query processing logic for user search requests.
 

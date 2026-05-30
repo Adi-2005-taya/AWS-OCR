@@ -1,4 +1,4 @@
-"""Structured logging configuration for OCR Document Extraction System
+﻿"""Structured logging configuration for DocuSense System
 
 This module configures structured logging using structlog for consistent,
 machine-readable log output across all components.

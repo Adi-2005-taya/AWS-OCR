@@ -1,4 +1,4 @@
-"""Text cleaning and normalization for OCR Document Extraction System
+﻿"""Text cleaning and normalization for DocuSense System
 
 This module provides text cleaning functions to normalize and structure
 OCR-extracted text for indexing and search.

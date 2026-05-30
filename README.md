@@ -1,4 +1,4 @@
-# OCR Document Extraction System
+﻿# DocuSense System
 
 An automated OCR-based document text extraction and search system that enables users to upload document images, automatically extracts text using optical character recognition, and provides full-text search capabilities.
 
@@ -175,6 +175,10 @@ mypy src
 ## License
 
 [Add license information]
+
+## Deployment
+
+For deploying the application on AWS EC2, please refer to the [AWS Deployment Guide](docs/aws_deployment_guide.md). It contains recommendations on EC2 instance sizing (such as using `t3.small` for a 10MB maximum file size) and step-by-step setup instructions.
 
 ## Contributing
 

@@ -1,4 +1,4 @@
-"""Constants for OCR Document Extraction System
+﻿"""Constants for DocuSense System
 
 This module defines system-wide constants used across components.
 """

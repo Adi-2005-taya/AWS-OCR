@@ -1,1 +1,1 @@
-"""Configuration management for OCR Document Extraction System"""
+﻿"""Configuration management for DocuSense System"""

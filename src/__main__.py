@@ -1,4 +1,4 @@
-"""Main entry point for OCR Document Extraction System
+﻿"""Main entry point for DocuSense System
 
 This module provides the main entry point for running the application.
 """

@@ -1,4 +1,4 @@
-"""Data models for OCR Document Extraction System
+"""Data models for DocuSense System
 
 This module defines the core data models used throughout the system.
 """
@@ -145,6 +145,10 @@ class IndexedDocument(BaseModel):
         description="Index timestamp"
     )
     searchableContent: str = Field(..., description="Search-optimized content")
+    ownerId: str | None = Field(
+        default=None,
+        description="User ID of the document owner"
+    )
     metadata: Dict[str, Any] = Field(
         default_factory=dict,
         description="Additional metadata (e.g. per-page text)"

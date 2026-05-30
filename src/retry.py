@@ -1,4 +1,4 @@
-"""Retry mechanisms for OCR Document Extraction System
+﻿"""Retry mechanisms for DocuSense System
 
 This module provides exponential backoff retry logic for upload failures
 and a retry queue for indexing failures.

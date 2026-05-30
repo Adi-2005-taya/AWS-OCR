@@ -1,4 +1,4 @@
-"""Search engine abstraction for OCR Document Extraction System
+"""Search engine abstraction for DocuSense System
 
 This module provides an abstract search interface and concrete implementations
 for indexing and querying document content.
@@ -146,6 +146,34 @@ class InMemorySearchEngine(SearchEngineInterface):
         """Initialize in-memory search engine."""
         self.documents: Dict[UUID, IndexedDocument] = {}
         self.inverted_index: Dict[str, set[UUID]] = {}
+        self.db_path = Path("data/search_index.json")
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._load_from_disk()
+        
+    def _save_to_disk(self) -> None:
+        """Save the current search index to disk."""
+        data = {
+            "documents": {str(k): v.model_dump(mode='json') for k, v in self.documents.items()},
+            "inverted_index": {k: [str(uid) for uid in v] for k, v in self.inverted_index.items()}
+        }
+        with open(self.db_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+            
+    def _load_from_disk(self) -> None:
+        """Load the search index from disk if it exists."""
+        if not self.db_path.exists():
+            return
+        try:
+            with open(self.db_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            docs = data.get("documents", {})
+            self.documents = {UUID(k): IndexedDocument(**v) for k, v in docs.items()}
+            
+            inv_idx = data.get("inverted_index", {})
+            self.inverted_index = {k: set(UUID(uid) for uid in v) for k, v in inv_idx.items()}
+        except Exception as e:
+            pass # Failsafe: if JSON is corrupt, start fresh
     
     def index(self, document: IndexedDocument) -> None:
         """Index a document for search.
@@ -173,6 +201,7 @@ class InMemorySearchEngine(SearchEngineInterface):
                     if word not in self.inverted_index:
                         self.inverted_index[word] = set()
                     self.inverted_index[word].add(document.documentId)
+            self._save_to_disk()
                     
         except Exception as e:
             raise IndexingError(
@@ -193,6 +222,7 @@ class InMemorySearchEngine(SearchEngineInterface):
         try:
             for document in documents:
                 self.index(document)
+            self._save_to_disk()
         except IndexingError:
             raise
         except Exception as e:
@@ -303,6 +333,7 @@ class InMemorySearchEngine(SearchEngineInterface):
             # Remove document
             del self.documents[document_id]
             
+            self._save_to_disk()
             return True
             
         except Exception as e:
@@ -363,6 +394,7 @@ class PersistentSearchEngine(InMemorySearchEngine):
                     "indexTimestamp":   doc.indexTimestamp.isoformat(),
                     "searchableContent": doc.searchableContent,
                     "metadata":         doc.metadata,
+                    "ownerId":          doc.ownerId,
                 }
                 for doc_id, doc in self.documents.items()
             }
@@ -383,6 +415,7 @@ class PersistentSearchEngine(InMemorySearchEngine):
                     indexTimestamp=datetime.fromisoformat(entry["indexTimestamp"]),
                     searchableContent=entry["searchableContent"],
                     metadata=entry.get("metadata", {}),
+                    ownerId=entry.get("ownerId"),
                 )
                 super().index(doc)
         except Exception:

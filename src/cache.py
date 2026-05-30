@@ -1,4 +1,4 @@
-"""Document caching layer for OCR Document Extraction System
+﻿"""Document caching layer for DocuSense System
 
 Provides an in-memory LRU cache with TTL expiry for frequently accessed
 documents, with hit/miss metrics.

@@ -1,10 +1,10 @@
-@echo off
+﻿@echo off
 echo.
 echo  ╔══════════════════════════════════════╗
-echo  ║   OCR Document Extraction System     ║
+echo  ║   DocuSense System     ║
 echo  ║   Starting server...                 ║
 echo  ╚══════════════════════════════════════╝
-echo.verse
+echo.
 echo  Open your browser at: http://localhost:8000
 echo  Press Ctrl+C to stop the server
 echo.

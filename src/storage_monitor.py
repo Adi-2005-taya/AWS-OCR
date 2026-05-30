@@ -1,4 +1,4 @@
-"""Storage Monitor for OCR Document Extraction System
+"""Storage Monitor for DocuSense System
 
 This module provides an event-driven storage monitor that detects new file uploads
 and triggers the Document Processor. It implements an event listener pattern with
@@ -50,6 +50,7 @@ class UploadEvent:
     content_type: str
     upload_timestamp: datetime
     metadata: Dict[str, Any]
+    owner_id: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert event to dictionary representation.
@@ -64,6 +65,7 @@ class UploadEvent:
             "content_type": self.content_type,
             "upload_timestamp": self.upload_timestamp.isoformat(),
             "metadata": self.metadata,
+            "owner_id": self.owner_id,
         }
 
 
@@ -98,6 +100,7 @@ class EventPayloadParser:
             storage_url = payload.get("storage_url")
             content_type = payload.get("content_type")
             upload_timestamp = payload.get("upload_timestamp")
+            owner_id = payload.get("owner_id")
             
             # Validate required fields
             if not document_id:
@@ -174,6 +177,7 @@ class EventPayloadParser:
                 content_type=content_type,
                 upload_timestamp=upload_timestamp,
                 metadata=metadata,
+                owner_id=owner_id,
             )
             
         except InvalidEventError:

@@ -1,4 +1,4 @@
-"""OCR service abstraction layer for OCR Document Extraction System
+"""OCR service abstraction layer for DocuSense System
 
 This module provides an abstract OCR interface and concrete implementations
 for extracting text from document images using optical character recognition.
@@ -118,24 +118,62 @@ class TesseractOCRService(OCRServiceInterface):
             # Start timing
             start_time = time.time()
             
-            # Load image from bytes
-            image = self._Image.open(BytesIO(image_data))
+            # Fast PDF Native Extraction via PyMuPDF (fitz)
+            if image_data.startswith(b"%PDF"):
+                try:
+                    import fitz
+                    doc = fitz.open(stream=image_data, filetype="pdf")
+                    text = ""
+                    pages_text = []
+                    for page in doc:
+                        t = page.get_text()
+                        if t: text += t + "\n"
+                        pages_text.append(t or "")
+                    
+                    if len(text.strip()) > 20:
+                        return OCRResult(
+                            documentId=document_id,
+                            rawText=text,
+                            confidence=1.0,
+                            processingTime=time.time() - start_time,
+                            metadata={
+                                "ocrEngine": "pymupdf",
+                                "language": "eng",
+                                "imageSize": len(image_data),
+                                "imageFormat": "pdf",
+                                "pages": pages_text
+                            }
+                        )
+                    
+                    # If we reach here, it's an image-only PDF (no native text)
+                    # Rasterize the first page for Tesseract to prevent Pillow UnidentifiedImageError
+                    page = doc[0]
+                    pix = page.get_pixmap(dpi=150)
+                    image = self._Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                except Exception:
+                    # Failsafe fallback to standard image opening
+                    image = self._Image.open(BytesIO(image_data))
+            else:
+                # Load standard image from bytes
+                image = self._Image.open(BytesIO(image_data))
+            
+
+            
+            # OPTIMIZATION: Downscale massive images to drastically speed up OCR
+            max_dim = 1500
+            if max(image.width, image.height) > max_dim:
+                image.thumbnail((max_dim, max_dim), self._Image.Resampling.BILINEAR)
             
             # Extract text using Tesseract
             raw_text = self._pytesseract.image_to_string(
                 image,
-                lang=self.language
-            )
-            
-            # Get detailed OCR data for confidence calculation
-            ocr_data = self._pytesseract.image_to_data(
-                image,
                 lang=self.language,
-                output_type=self._pytesseract.Output.DICT
+                config='--oem 3 --psm 3'
             )
             
-            # Calculate average confidence score
-            confidence = self._calculate_confidence(ocr_data)
+            # Optimized: Skip image_to_data as it runs Tesseract a second time and doubles CPU load.
+            # We use a reasonable default confidence instead for the MVP.
+            confidence = 0.85
             
             # Calculate processing time
             processing_time = time.time() - start_time

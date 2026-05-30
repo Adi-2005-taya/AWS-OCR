@@ -1,4 +1,4 @@
-"""Status management layer for OCR Document Extraction System
+﻿"""Status management layer for DocuSense System
 
 Handles status persistence, change event logging, and index timestamp
 recording for documents.

@@ -1,4 +1,4 @@
-"""Storage abstraction layer for OCR Document Extraction System
+"""Storage abstraction layer for DocuSense System
 
 This module provides an abstract storage interface and concrete implementations
 for storing, retrieving, and deleting document images.
@@ -158,8 +158,13 @@ class LocalFileSystemStorage(StorageInterface):
         self._encryption_key: Optional[Fernet] = None
         if self.encryption_enabled:
             if encryption_key is None:
-                # Generate a new key (in production, this should be loaded from secure storage)
-                encryption_key = Fernet.generate_key()
+                key_path = Path("data/.storage_key")
+                if key_path.exists():
+                    encryption_key = key_path.read_bytes()
+                else:
+                    encryption_key = Fernet.generate_key()
+                    key_path.parent.mkdir(parents=True, exist_ok=True)
+                    key_path.write_bytes(encryption_key)
             self._encryption_key = Fernet(encryption_key)
         
         # Initialize malware scanner

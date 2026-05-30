@@ -1,4 +1,4 @@
-# Technical Design: OCR Document Extraction System
+﻿# Technical Design: DocuSense System
 
 ## Overview
 

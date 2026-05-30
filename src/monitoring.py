@@ -1,4 +1,4 @@
-"""Monitoring and observability for OCR Document Extraction System
+﻿"""Monitoring and observability for DocuSense System
 
 Provides metrics collection and health check endpoints for all
 external dependencies.

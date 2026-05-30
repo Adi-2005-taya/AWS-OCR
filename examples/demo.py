@@ -1,4 +1,4 @@
-"""Demo: OCR Document Extraction System
+﻿"""Demo: DocuSense System
 
 Shows how to wire up the application and exercise the main workflows:
   1. Upload a document
@@ -55,7 +55,7 @@ def build_app(storage_path: str = "./data/demo_storage") -> OCRApplication:
 
 def main():
     print("=" * 60)
-    print("  OCR Document Extraction System — Demo")
+    print("  DocuSense System — Demo")
     print("=" * 60)
 
     app = build_app()

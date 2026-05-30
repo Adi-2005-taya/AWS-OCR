@@ -1,4 +1,4 @@
-"""Configuration management for OCR Document Extraction System
+"""Configuration management for DocuSense System
 
 This module provides environment-specific configuration using pydantic settings.
 Configuration can be loaded from environment variables or .env files.
@@ -90,7 +90,7 @@ class LoggingSettings(BaseSettings):
 class Settings(BaseSettings):
     """Main application settings"""
     
-    app_name: str = Field(default="OCR Document Extraction", description="Application name")
+    app_name: str = Field(default="DocuSense", description="Application name")
     app_version: str = Field(default="0.1.0", description="Application version")
     environment: str = Field(default="development", description="Environment (development, staging, production)")
     
@@ -108,6 +108,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         env_nested_delimiter="__",
         case_sensitive=False,
+        extra="ignore",
     )
 
 

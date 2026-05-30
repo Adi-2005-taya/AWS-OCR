@@ -1,4 +1,4 @@
-"""Rate limiting for OCR Document Extraction System
+﻿"""Rate limiting for DocuSense System
 
 This module provides rate limiting functionality to prevent exceeding service quotas.
 Uses a token bucket algorithm for smooth rate limiting.
