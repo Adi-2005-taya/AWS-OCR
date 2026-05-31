@@ -892,7 +892,12 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
   .guide-steps,.score-legend,#metrics-grid{grid-template-columns:1fr 1fr}
   #detail-drawer{width:100%; right:-100%;}
   #detail-drawer.open{right:0}
-  header { flex-wrap: wrap; justify-content: center; gap: 0.8rem; }
+  header { flex-wrap: wrap; justify-content: center; gap: 0.8rem; padding: 0.5rem; }
+}
+@media(max-width:480px){
+  .guide-steps,.score-legend,#metrics-grid{grid-template-columns:1fr}
+  header { flex-direction: column; gap: 0.5rem; }
+  .header-right { width: 100%; justify-content: center; flex-wrap: wrap; gap: 0.4rem; }
 }
 </style>
 
