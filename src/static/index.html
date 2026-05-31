@@ -89,11 +89,11 @@
    BASE
 ═══════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth; overflow-x:hidden; max-width:100vw;}
 body{
   font-family:'Inter',system-ui,sans-serif;
   background:var(--bg);color:var(--text);
-  min-height:100vh;overflow-x:hidden;
+  min-height:100vh;overflow-x:hidden;max-width:100vw;
   transition:background .4s,color .4s;
 }
 /* Laser theme: body must be transparent so the WebGL canvas shows through */
@@ -872,11 +872,19 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
   border-color:rgba(168,85,247,.45);
 }
 
+@media(max-width:768px){
+  header { padding: 0.6rem 1rem; }
+  .logo-text p { display: none; }
+  .header-right { gap: 0.5rem; }
+  .logo-icon { width: 36px; height: 36px; font-size: 1rem; }
+}
 @media(max-width:640px){
   main{grid-template-columns:1fr}
   .full{grid-column:1}
   .guide-steps,.score-legend,#metrics-grid{grid-template-columns:1fr 1fr}
-  #detail-drawer{width:100%}
+  #detail-drawer{width:100%; right:-100%;}
+  #detail-drawer.open{right:0}
+  header { flex-wrap: wrap; justify-content: center; gap: 0.8rem; }
 }
 </style>
 
