@@ -1,4 +1,12 @@
-﻿# DocuSense System
+---
+title: DocuSense
+emoji: 📄
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+pinned: false
+---
+# DocuSense System
 
 An automated OCR-based document text extraction and search system that enables users to upload document images, automatically extracts text using optical character recognition, and provides full-text search capabilities.
 
