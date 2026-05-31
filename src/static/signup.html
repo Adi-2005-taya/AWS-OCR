@@ -392,10 +392,18 @@ async function handleGoogleLogin() {
       document.getElementById('error-text').innerHTML = 'Google Sign-Up is not configured yet. Please add your <strong>GOOGLE_CLIENT_ID</strong> and <strong>GOOGLE_CLIENT_SECRET</strong> to the <code>.env</code> file.';
       document.getElementById('error-box').style.display = 'block';
     } else {
-      window.top.location.href = '/auth/google';
+      if (window.self !== window.top) {
+        window.open('/auth/google', '_blank');
+      } else {
+        window.location.href = '/auth/google';
+      }
     }
   } catch (err) {
-    window.top.location.href = '/auth/google';
+    if (window.self !== window.top) {
+      window.open('/auth/google', '_blank');
+    } else {
+      window.location.href = '/auth/google';
+    }
   }
 }
 

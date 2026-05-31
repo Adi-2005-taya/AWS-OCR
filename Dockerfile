@@ -35,4 +35,4 @@ USER user
 EXPOSE 7860
 
 # Command to start the Uvicorn server
-CMD ["uvicorn", "src.web:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "src.web:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips=*"]
