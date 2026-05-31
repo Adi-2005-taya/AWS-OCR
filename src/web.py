@@ -91,10 +91,10 @@ class RealFileOCRService(OCRServiceInterface):
             pytesseract.pytesseract.tesseract_cmd = _TESSERACT
             img = Image.open(io.BytesIO(image_bytes))
             # Downscale massive images — speeds up OCR significantly
-            max_dim = 1800
+            max_dim = 1024
             if max(img.width, img.height) > max_dim:
                 img.thumbnail((max_dim, max_dim), Image.Resampling.BILINEAR)
-            return pytesseract.image_to_string(img, config='--oem 3 --psm 3').strip()
+            return pytesseract.image_to_string(img, config='--oem 3 --psm 3 -c tessedit_do_invert=0').strip()
         except Exception:
             return ""
 
@@ -118,7 +118,7 @@ class RealFileOCRService(OCRServiceInterface):
             # Image-only PDF — rasterize for Tesseract below
             pix_list = []
             for page in doc:
-                pix_list.append(page.get_pixmap(dpi=150))
+                pix_list.append(page.get_pixmap(dpi=100))
             doc.close()
             # Convert pixmaps → PIL images and run Tesseract in parallel
             import pytesseract
@@ -128,12 +128,13 @@ class RealFileOCRService(OCRServiceInterface):
             def _ocr_pix(pix):
                 try:
                     img = _PIL_Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                    return pytesseract.image_to_string(img, config='--oem 3 --psm 3').strip()
+                    return pytesseract.image_to_string(img, config='--oem 3 --psm 3 -c tessedit_do_invert=0').strip()
                 except Exception:
                     return ""
 
+            import os
             from concurrent.futures import ThreadPoolExecutor
-            with ThreadPoolExecutor(max_workers=min(4, len(pix_list) or 1)) as ex:
+            with ThreadPoolExecutor(max_workers=min(os.cpu_count() or 4, len(pix_list) or 1)) as ex:
                 return list(ex.map(_ocr_pix, pix_list))
         except Exception:
             pass
@@ -144,15 +145,16 @@ class RealFileOCRService(OCRServiceInterface):
             from pdf2image import convert_from_bytes
             from concurrent.futures import ThreadPoolExecutor
             pytesseract.pytesseract.tesseract_cmd = _TESSERACT
-            images = convert_from_bytes(data, dpi=150, poppler_path=_POPPLER)
+            images = convert_from_bytes(data, dpi=100, poppler_path=_POPPLER)
 
             def _ocr_img(img):
                 try:
-                    return pytesseract.image_to_string(img, config='--oem 3 --psm 3').strip()
+                    return pytesseract.image_to_string(img, config='--oem 3 --psm 3 -c tessedit_do_invert=0').strip()
                 except Exception:
                     return ""
 
-            with ThreadPoolExecutor(max_workers=min(4, len(images) or 1)) as ex:
+            import os
+            with ThreadPoolExecutor(max_workers=min(os.cpu_count() or 4, len(images) or 1)) as ex:
                 return list(ex.map(_ocr_img, images))
         except Exception:
             pass
