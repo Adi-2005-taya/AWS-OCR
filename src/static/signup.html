@@ -275,9 +275,18 @@
 </head>
 <body>
 
-<div id="mobile-ribbon" style="position:fixed; top:0; left:0; right:0; background:linear-gradient(90deg, #ef4444, #f97316); color:white; text-align:center; padding:1.2rem; font-size:1.6rem; font-weight:700; z-index:9999; box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5); letter-spacing: 0.02em;">
+<div id="mobile-ribbon" style="position:fixed; top:0; left:0; right:0; background:linear-gradient(90deg, #ef4444, #f97316); color:white; text-align:center; padding:0.6rem; font-size:1rem; font-weight:600; z-index:9999; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5); letter-spacing: 0.02em; transition: opacity 0.5s ease;">
   ⚠️ This app is preferred to be used in PC since mobile android cant handle laser flow animation.
 </div>
+<script>
+  setTimeout(function(){
+    var r = document.getElementById('mobile-ribbon');
+    if(r){
+      r.style.opacity = '0';
+      setTimeout(function(){ r.style.display = 'none'; }, 500);
+    }
+  }, 5000);
+</script>
 
 
 
