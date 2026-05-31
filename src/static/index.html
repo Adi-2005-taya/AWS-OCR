@@ -8,6 +8,10 @@
     // Default new visitors to 'laser' (our recommended theme)
     // so they never see the pink aurora flash on first load
     var t = localStorage.getItem('theme') || 'laser';
+    var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile && t === 'laser') {
+      t = 'dark';
+    }
     document.documentElement.setAttribute('data-theme', t);
     /* For laser theme: inject critical CSS immediately so the aurora
        canvas is hidden and body is transparent from frame 0, before
@@ -881,6 +885,7 @@ input[type=text]::placeholder{color:var(--muted);font-size:.82rem}
   header, #detail-drawer, .card, #theme-picker-modal {
     background: var(--surface) !important;
   }
+  .theme-card[data-theme="laser"] { display: none !important; }
   header { padding: 0.6rem 1rem; }
   .logo-text p { display: none; }
   .header-right { gap: 0.5rem; }
@@ -3062,6 +3067,8 @@ function closeThemePicker(){
 }
 
 function pickTheme(theme){
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (isMobile && theme === 'laser') theme = 'dark';
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('theme', theme);
   localStorage.setItem('theme-chosen', '1');
@@ -3095,12 +3102,14 @@ function updateThemeUI(theme) {
 }
 
 (function(){
-  // Default new visitors to 'laser' — saves to localStorage immediately
-  // so the anti-FOUC head script also picks it up on the next visit
+  // Default new visitors to 'laser' (or dark on mobile)
   var hadTheme = localStorage.getItem('theme');
-  const s = hadTheme || 'laser';
+  let s = hadTheme || 'laser';
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (isMobile && s === 'laser') s = 'dark';
+  
   if (!hadTheme) {
-    try { localStorage.setItem('theme', 'laser'); } catch(e) {}
+    try { localStorage.setItem('theme', s); } catch(e) {}
   }
   document.documentElement.setAttribute('data-theme', s);
   updateThemeUI(s);

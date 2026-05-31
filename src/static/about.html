@@ -2557,9 +2557,13 @@ function updateThemeUI(theme) {
   if(tooltip) tooltip.textContent = text;
 }
 (function(){
-  const s=localStorage.getItem('theme')||'dark';
-  document.documentElement.setAttribute('data-theme',s);
-  updateThemeUI(s);
+    var t = localStorage.getItem('theme') || 'laser';
+    var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile && t === 'laser') {
+      t = 'dark';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  updateThemeUI(t);
 })();
 
 /* ══════════════════════════════════════════════════════
