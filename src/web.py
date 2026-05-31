@@ -428,6 +428,8 @@ def google_auth(request: Request):
     if not google_is_configured():
         return JSONResponse({"error": "Google OAuth not configured"}, status_code=503)
     base_url = str(request.base_url).rstrip("/")
+    if "hf.space" in base_url and base_url.startswith("http://"):
+        base_url = base_url.replace("http://", "https://")
     redirect_uri = f"{base_url}/auth/google/callback"
     url = build_google_auth_url(redirect_uri)
     return RedirectResponse(url=url, status_code=302)
@@ -442,6 +444,8 @@ async def google_callback(request: Request, code: str = "", state: str = "",
     if not validate_google_state(state):
         return RedirectResponse(url="/login?error=invalid_state", status_code=303)
     base_url = str(request.base_url).rstrip("/")
+    if "hf.space" in base_url and base_url.startswith("http://"):
+        base_url = base_url.replace("http://", "https://")
     redirect_uri = f"{base_url}/auth/google/callback"
     google_info = await exchange_google_code(code, redirect_uri)
     if not google_info or not google_info.get("email"):
