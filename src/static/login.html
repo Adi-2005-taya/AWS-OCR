@@ -610,9 +610,14 @@ if (containerEl) {
         let contextLost = false;
         let isVisible = true;
         const t0 = performance.now();
+        let lastLoopTime = 0;
 
         const loop = t => {
           if (contextLost || !isVisible) return;
+          if (window.innerWidth < 768) {
+            if (t - lastLoopTime < 40) { raf = requestAnimationFrame(loop); return; }
+            lastLoopTime = t;
+          }
           let timeValue = (t - t0) * 0.001;
           if (direction === 'pingpong') {
             const pingpongDuration = 10;

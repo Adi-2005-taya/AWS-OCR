@@ -1921,7 +1921,8 @@ html[data-theme="light"] #theme-icon-rays {
   let particles = [];
   function initParticles(){
     particles = [];
-    const n = Math.min(80, Math.floor(W * H / 14000));
+    let n = Math.min(80, Math.floor(W * H / 14000));
+    if(window.innerWidth < 768) n = Math.floor(n / 2);
     for(let i = 0; i < n; i++){
       particles.push({
         x: Math.random() * W,
@@ -1936,7 +1937,13 @@ html[data-theme="light"] #theme-icon-rays {
 
   let t = 0;
 
+  let lastTime1 = 0;
   function draw(){
+    if(window.innerWidth < 768) {
+      const now = performance.now();
+      if(now - lastTime1 < 40) { requestAnimationFrame(draw); return; }
+      lastTime1 = now;
+    }
     const theme = document.documentElement.getAttribute('data-theme');
     const isDark = theme !== 'light';
     
@@ -2608,7 +2615,8 @@ html[data-theme="light"] #theme-icon-rays {
   let stars = [];
   function initStars(){
     stars = [];
-    const n = Math.floor(W * H / 4000);
+    let n = Math.floor(W * H / 4000);
+    if(window.innerWidth < 768) n = Math.floor(n / 2);
     for(let i = 0; i < n; i++){
       stars.push({
         x: Math.random()*W, y: Math.random()*H,
@@ -2667,7 +2675,13 @@ html[data-theme="light"] #theme-icon-rays {
     }
   }
 
+  let lastTime2 = 0;
   function draw(){
+    if(window.innerWidth < 768) {
+      const now = performance.now();
+      if(now - lastTime2 < 40) { requestAnimationFrame(draw); return; }
+      lastTime2 = now;
+    }
     const theme = document.documentElement.getAttribute('data-theme');
     // In laser mode, clear canvas and do nothing — laser WebGL handles all visuals
     if (theme === 'laser') {

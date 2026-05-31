@@ -453,9 +453,16 @@ void main(){
   
   const checkTheme = () => document.documentElement.getAttribute('data-theme') === 'laser';
 
+  let lastLaserTime = 0;
   const animate = () => {
     requestAnimationFrame(animate);
     if (!checkTheme() || paused || !inView) return;
+
+    if (window.innerWidth < 768) {
+      const now = performance.now();
+      if (now - lastLaserTime < 40) return;
+      lastLaserTime = now;
+    }
 
     const t = clock.getElapsedTime();
     const dt = Math.max(0, t - prevTime);
