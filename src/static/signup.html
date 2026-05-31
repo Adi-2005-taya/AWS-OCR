@@ -392,10 +392,10 @@ async function handleGoogleLogin() {
       document.getElementById('error-text').innerHTML = 'Google Sign-Up is not configured yet. Please add your <strong>GOOGLE_CLIENT_ID</strong> and <strong>GOOGLE_CLIENT_SECRET</strong> to the <code>.env</code> file.';
       document.getElementById('error-box').style.display = 'block';
     } else {
-      window.location.href = '/auth/google';
+      window.top.location.href = '/auth/google';
     }
   } catch (err) {
-    window.location.href = '/auth/google';
+    window.top.location.href = '/auth/google';
   }
 }
 
