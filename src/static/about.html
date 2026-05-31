@@ -67,6 +67,75 @@
   --grad2:linear-gradient(135deg,#7c3aed,#e879f9);
   --grad3:linear-gradient(135deg,#22c55e,#16a34a);
 }
+
+/* ═══════════════════════════════════════════
+   STRUCTURAL THEME OVERRIDES
+═══════════════════════════════════════════ */
+
+/* --- MATRIX (Pure Terminal) --- */
+[data-theme="matrix"] .card, [data-theme="matrix"] .search-bar {
+  background: #050505 !important;
+  border: none !important;
+  border-left: 2px solid var(--p1) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding-left: 1.5rem !important;
+}
+[data-theme="matrix"] .card-glow { display: none !important; }
+[data-theme="matrix"] .btn {
+  background: #000 !important;
+  border: 1px dashed var(--p1) !important;
+  border-radius: 0 !important;
+  color: var(--p1) !important;
+  box-shadow: none !important;
+}
+[data-theme="matrix"] .result {
+  background: transparent !important;
+  border: 1px dotted var(--p1) !important;
+  border-radius: 0 !important;
+}
+
+/* --- WARP (Extreme Glassmorphism) --- */
+[data-theme="warp"] .card, [data-theme="warp"] .search-bar {
+  border-radius: 40px !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  background: rgba(0,20,40,0.3) !important;
+  border: 1px solid rgba(0,255,255,0.3) !important;
+  box-shadow: 0 8px 32px rgba(0,255,255,0.1) !important;
+}
+[data-theme="warp"] .btn {
+  border-radius: 30px !important;
+  backdrop-filter: blur(8px) !important;
+}
+[data-theme="warp"] .result { border-radius: 20px !important; }
+
+/* --- LASER (LaserFlow Background) --- */
+:root[data-theme="laser"]{
+  --bg:#1a052e;--surface:rgba(20,15,30,.3);--surface2:rgba(30,20,40,.3);
+  --border:rgba(255,121,198,.4);--border2:rgba(255,121,198,.6);
+  --text:#f8f8f2;--muted:#bd93f9;--shadow:rgba(255,121,198,.3);
+  --header-bg:rgba(18,15,23,.8);
+  --p1:#FF79C6;--p2:#bd93f9;--p3:#ffb86c;--p4:#ff79c6;--p5:#8be9fd;
+  --card-shine:rgba(255,121,198,.1);
+  --success:#50fa7b;--warning:#f1fa8c;--danger:#ff5555;
+  --grad:linear-gradient(135deg,#FF79C6,#bd93f9);
+  --grad2:linear-gradient(135deg,#bd93f9,#8be9fd);
+  --grad3:linear-gradient(135deg,#FF79C6,#ffb86c);
+}
+[data-theme="laser"] #bg-canvas { display: none !important; }
+[data-theme="laser"] #fx-canvas  { display: none !important; }
+[data-theme="laser"] #laser-flow-container { display: block !important; background: #1a052e; }
+[data-theme="laser"] #laser-bg-shield { display: block !important; }
+[data-theme="laser"] .card, [data-theme="laser"] .search-bar {
+  border-radius: 20px !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  background: rgba(18,15,23,0.4) !important;
+  border: 1px solid rgba(255,121,198,0.4) !important;
+  box-shadow: 0 4px 20px rgba(255,121,198,0.15) !important;
+}
+[data-theme="laser"] .btn { border-radius: 12px !important; }
 </style>
 <style>
 /* ═══════════════════════════════════════════
@@ -1173,6 +1242,10 @@ html[data-theme="light"] #theme-icon-rays {
 <canvas id="bg-canvas"></canvas>
 <!-- FX overlay canvas -->
 <canvas id="fx-canvas" style="position:fixed;inset:0;z-index:-2;pointer-events:none"></canvas>
+
+<!-- Laser Background Containers -->
+<div id="laser-bg-shield" style="position:fixed;inset:0;background:#1a052e;z-index:-5;display:none;"></div>
+<div id="laser-flow-container" style="position:fixed;inset:0;z-index:-4;pointer-events:none;display:none;"></div>
 
 <!-- Toast notification -->
 <div id="toast"></div>
@@ -2446,6 +2519,7 @@ function toggleTheme(){
   if(currentTheme === 'dark') next = 'light';
   else if(currentTheme === 'light') next = 'matrix';
   else if(currentTheme === 'matrix') next = 'warp';
+  else if(currentTheme === 'warp') next = 'laser';
   else next = 'dark';
   html.setAttribute('data-theme',next);
   localStorage.setItem('theme',next);
@@ -2461,7 +2535,8 @@ function updateThemeUI(theme) {
   if(theme === 'dark') { icon = '🌙'; text = 'Dark'; }
   else if(theme === 'light') { icon = '☀️'; text = 'Light'; }
   else if(theme === 'matrix') { icon = '🖥️'; text = 'Matrix'; }
-  else { icon = '🚀'; text = 'Warp'; }
+  else if(theme === 'warp') { icon = '🚀'; text = 'Warp'; }
+  else { icon = '✨'; text = 'Laser'; }
 
   if(thumb) thumb.textContent = icon;
   if(label) label.textContent = text;
@@ -3080,5 +3155,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 300);
 });
 </script>
+<script src="/static/laser.js?v=8"></script>
 </body>
 </html>
