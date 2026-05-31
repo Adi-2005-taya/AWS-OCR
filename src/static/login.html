@@ -6,7 +6,7 @@
 <link rel="icon" href="/static/docusense-logo.jpg" type="image/jpeg">
 <meta property="og:image" content="/static/docusense-logo.jpg">
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="viewport" content="width=1200"/>
 <title>Sign In — DocuSense</title>
 <meta name="description" content="Sign in to DocuSense to extract and search text from your documents."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -620,9 +620,14 @@ if (containerEl) {
 
         const loop = t => {
           if (contextLost || !isVisible) return;
-          if (window.innerWidth < 768) {
-            if (t - lastLoopTime < 40) { raf = requestAnimationFrame(loop); return; }
-            lastLoopTime = t;
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          if (isMobile) {
+            const now = performance.now();
+            if (now - lastLoopTime < 100) {
+              raf = requestAnimationFrame(loop);
+              return;
+            }
+            lastLoopTime = now;
           }
           let timeValue = (t - t0) * 0.001;
           if (direction === 'pingpong') {

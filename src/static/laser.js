@@ -456,13 +456,15 @@ void main(){
   let lastLaserTime = 0;
   let lastTime = 0;
   let animId;
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
   const animate = () => {
     animId = requestAnimationFrame(animate);
     if (!checkTheme() || paused || !inView) return;
 
-    if (window.innerWidth < 768) {
+    if (isMobile) {
       const now = performance.now();
-      if (now - lastTime < 60) {
+      if (now - lastTime < 100) { // 10 FPS to eliminate lag
         return;
       }
       lastTime = now;
